@@ -39,14 +39,14 @@ const NAV: NavItem[] = [
       {
         key: 'basic-config',
         icon: '🗂️',
-        label: 'ตรวจสอบรหัสข้อมูลพื้นฐาน',
+        label: 'ตั้งค่าข้อมูลพื้นฐาน 43 แฟ้ม',
         sublabel: 'ส่งออก 43 แฟ้ม',
         ready: true,
       },
       {
         key: 'eclaim-config',
         icon: '💳',
-        label: 'การตั้งค่า E-Claim',
+        label: 'ตั้งค่าข้อมูลพื้นฐาน ส่ง E-Claim',
         sublabel: 'สิทธิ, คลินิก, ยา, ค่าบริการ',
         ready: true,
       },
