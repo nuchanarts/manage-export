@@ -1,4 +1,5 @@
 import { getCategory, listCategories, CATEGORY_REGISTRY } from '../../src/services/categoryRegistry'
+import { buildListSql, buildStdOptionsSql, buildUpdateSql } from '../../src/services/categoryRegistry'
 
 describe('category registry', () => {
   it('has occupation fully configured and confirmed', () => {
@@ -23,5 +24,30 @@ describe('category registry', () => {
       expect(c.label.length).toBeGreaterThan(0)
       expect(typeof c.pending).toBe('boolean')
     }
+  })
+})
+
+describe('SQL builders', () => {
+  const occ = getCategory('occupation')!
+
+  it('buildListSql LEFT JOINs the standard table and flags mapped', () => {
+    const sql = buildListSql(occ)
+    expect(sql).toContain('FROM `occupation`')
+    expect(sql).toContain('LEFT JOIN `provis_occupa`')
+    expect(sql).toContain('`occupation`.`nhso_code`')
+    expect(sql).not.toMatch(/;\s*\S/) // single statement, no stacked queries
+  })
+
+  it('buildStdOptionsSql selects code+name from the provis table', () => {
+    const sql = buildStdOptionsSql(occ)
+    expect(sql).toContain('FROM `provis_occupa`')
+    expect(sql).toContain('`code`')
+    expect(sql).toContain('`name`')
+  })
+
+  it('buildUpdateSql writes only the mapping column, parameterized by PK', () => {
+    const { sql, params } = buildUpdateSql(occ, '05', '0510')
+    expect(sql).toBe('UPDATE `occupation` SET `nhso_code` = ? WHERE `occupation` = ?')
+    expect(params).toEqual(['0510', '05'])
   })
 })
