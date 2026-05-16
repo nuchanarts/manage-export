@@ -18,7 +18,7 @@ describe('category registry', () => {
 
   it('lists every category with key + label', () => {
     const list = listCategories()
-    expect(list.length).toBeGreaterThanOrEqual(2)
+    expect(list.length).toBeGreaterThanOrEqual(30)
     for (const c of list) {
       expect(c.key.length).toBeGreaterThan(0)
       expect(c.label.length).toBeGreaterThan(0)
@@ -49,5 +49,21 @@ describe('SQL builders', () => {
     const { sql, params } = buildUpdateSql(occ, '05', '0510')
     expect(sql).toBe('UPDATE `occupation` SET `nhso_code` = ? WHERE `occupation` = ?')
     expect(params).toEqual(['0510', '05'])
+  })
+})
+
+describe('registry integrity', () => {
+  it('uses only safe identifiers everywhere', () => {
+    const safe = /^[A-Za-z0-9_]+$/
+    for (const c of CATEGORY_REGISTRY) {
+      for (const v of [c.table, c.pk, c.nameCol, c.mapCol, c.stdTable, c.stdCodeCol, c.stdNameCol]) {
+        expect(v).toMatch(safe)
+      }
+    }
+  })
+
+  it('has unique keys', () => {
+    const keys = CATEGORY_REGISTRY.map(c => c.key)
+    expect(new Set(keys).size).toBe(keys.length)
   })
 })
