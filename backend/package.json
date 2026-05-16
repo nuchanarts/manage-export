@@ -36,6 +36,11 @@
     "testEnvironment": "node",
     "roots": [
       "<rootDir>/tests"
-    ]
+    ],
+    "globals": {
+      "ts-jest": {
+        "isolatedModules": true
+      }
+    }
   }
 }
