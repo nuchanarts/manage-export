@@ -33,7 +33,7 @@ No new database is introduced — the system reads from the existing hospital da
 
 **Performance Goals**: Search results in <5s for 1-month range; Excel export of 10k rows in <60s
 
-**Constraints**: Read-only database access; no mobile; no auth complexity (single-hospital LAN deployment)
+**Constraints**: Read-only database access EXCEPT mapping columns explicitly registered in the category registry (`backend/src/services/categoryRegistry.ts`), which the Basic Data Check page may UPDATE; no mobile; no auth complexity (single-hospital LAN deployment)
 
 **Scale/Scope**: ~10 concurrent users; up to 50,000 records/search; single-site hospital deployment
 
