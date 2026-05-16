@@ -3,7 +3,32 @@
     "allow": [
       "Bash(uv tool *)",
       "Bash(specify init *)",
-      "PowerShell(chcp 65001 *)"
+      "PowerShell(chcp 65001 *)",
+      "PowerShell(npx ccstatusline@latest 2>&1)",
+      "PowerShell(claude mcp *)",
+      "Skill(speckit-specify)",
+      "Skill(speckit-git-feature)",
+      "PowerShell(.specify\\\\scripts\\\\powershell\\\\setup-plan.ps1 -Json)",
+      "PowerShell(.specify\\\\scripts\\\\powershell\\\\setup-tasks.ps1 -Json)",
+      "PowerShell(Get-ChildItem \"D:\\\\01. Project Hospital\\\\BGS-Dev-Project\\\\BGS Check Export\" -Recurse | Where-Object { $_.Name -match \"tasks.md|plan.md|spec.md\" } | Select-Object FullName)",
+      "Skill(speckit-implement)",
+      "Skill(speckit-analyze)",
+      "PowerShell(Add-Type -AssemblyName System.IO.Compression.FileSystem; $zip = [System.IO.Compression.ZipFile]::OpenRead\\(\"C:\\\\Users\\\\MS-10\\\\Desktop\\\\F43_99999_20260101145155.zip\"\\); $zip.Entries | Select-Object Name, Length | Sort-Object Name | Format-Table -AutoSize; $zip.Dispose\\(\\))",
+      "PowerShell(Get-Process *)",
+      "Bash(curl -s -X POST http://localhost:6000/api/validate -F \"file=@C:/Users/MS-10/Desktop/F43_99999_20260101145155.zip\" --max-time 90)",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\MS-10\\\\Desktop\\\\\" | Where-Object { $_.Name -match \"std|43|structure|โครงสร้าง\" } | Select-Object Name, Length)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\MS-10\\\\Desktop\\\\EHPCISWebApplication\\\\\" | Where-Object { $_.Name -match \"std43|xlsx|csv|schema\" } | Select-Object Name, Length)",
+      "Bash(curl *)",
+      "Bash(xargs grep -l \"DB_SERVER\\\\|DATABASE_URL\\\\|ConnectionString\\\\|server=\")",
+      "Bash(node -e \"const c=[];process.stdin.on\\('data',d=>c.push\\(d\\)\\);process.stdin.on\\('end',\\(\\)=>{const r=Buffer.concat\\(c\\).toString\\(\\);try{const d=JSON.parse\\(r\\);console.log\\('total:',d.total,'rows:',d.data?.length,'error:',d.error,d.message||''\\)}catch\\(e\\){console.log\\('RAW:',r.slice\\(0,300\\)\\)}}\\)\")",
+      "Bash(node -e \"const c=[];process.stdin.on\\('data',d=>c.push\\(d\\)\\);process.stdin.on\\('end',\\(\\)=>{const r=Buffer.concat\\(c\\).toString\\(\\);try{const d=JSON.parse\\(r\\);console.log\\('total:',d.total,'sample:',JSON.stringify\\(d.data?.[0]||d.error||d\\)\\)}catch\\(e\\){console.log\\('RAW:',r.slice\\(0,400\\)\\)}}\\)\")",
+      "Bash(node -e \"const c=[];process.stdin.on\\('data',d=>c.push\\(d\\)\\);process.stdin.on\\('end',\\(\\)=>{try{const d=JSON.parse\\(Buffer.concat\\(c\\).toString\\(\\)\\);console.log\\('total:',d.total,'sample HN:',d.data?.[0]?.HN,'DATE:',d.data?.[0]?.DATE_SERV\\)}catch\\(e\\){}}\\)\")",
+      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\MS-10\\\\Desktop\\\\EHPCISWebApplication\\\\\" | Where-Object { $_.Name -match \"43|แฟ้ม|standard|structure\" } | Select-Object Name, Length)",
+      "Bash(grep -E \"\\\\.env$|\\\\.env\\\\.\")",
+      "Bash(git check-ignore *)",
+      "Bash(git add *)"
     ]
   }
 }
