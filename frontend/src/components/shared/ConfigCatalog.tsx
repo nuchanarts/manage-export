@@ -782,9 +782,10 @@ function DataTable({
 export interface ConfigCatalogProps {
   apiBase: string      // e.g. '/api/basic-config' or '/api/eclaim-config'
   sidebarTitle: string // Thai label shown in the sidebar header
+  relatedLinks?: { label: string; url: string }[] // optional external links shown in the sidebar header
 }
 
-export function ConfigCatalog({ apiBase, sidebarTitle }: ConfigCatalogProps) {
+export function ConfigCatalog({ apiBase, sidebarTitle, relatedLinks }: ConfigCatalogProps) {
   const { data: menus = [] } = useQuery({
     queryKey: [`${apiBase}-menus`],
     queryFn: () =>
@@ -803,6 +804,21 @@ export function ConfigCatalog({ apiBase, sidebarTitle }: ConfigCatalogProps) {
         <div className="px-3 py-2.5 border-b bg-gray-50">
           <p className="text-xs font-semibold text-gray-600">{sidebarTitle}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">{menus.length} รายการ</p>
+          {relatedLinks && relatedLinks.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1">
+              {relatedLinks.map(l => (
+                <a
+                  key={l.url}
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-blue-700 hover:underline inline-flex items-center gap-1"
+                >
+                  🔗 {l.label} <span aria-hidden="true">↗</span>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
         <nav>
           {menus.map(m => (
