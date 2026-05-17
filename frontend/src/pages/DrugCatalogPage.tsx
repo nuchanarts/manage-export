@@ -52,6 +52,29 @@ export function DrugCatalogPage() {
         </div>
       </div>
 
+      {/* Related external links */}
+      <div className="flex flex-wrap items-center gap-2 bg-white rounded-lg shadow px-4 py-2.5 text-sm">
+        <span className="text-gray-500">ลิงก์ที่เกี่ยวข้อง:</span>
+        <a
+          href="https://drug.nhso.go.th/drugcatalogue/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium transition-colors"
+        >
+          💊 Drug Catalogue (สปสช.)
+          <span aria-hidden="true" className="text-xs">↗</span>
+        </a>
+        <a
+          href="https://this.or.th/service/tmt/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium transition-colors"
+        >
+          🧬 TMT (Thai Medicines Terminology)
+          <span aria-hidden="true" className="text-xs">↗</span>
+        </a>
+      </div>
+
       {/* Loading state */}
       {isLoading && (
         <div className="bg-white rounded-lg shadow p-10 flex justify-center items-center">
@@ -84,11 +107,11 @@ export function DrugCatalogPage() {
 
       {/* Table */}
       {!isLoading && !isError && filtered.length > 0 && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="bg-white rounded-lg shadow">
+          <div className="overflow-auto max-h-[72vh] rounded-lg">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="bg-blue-700 text-white sticky top-0">
+                <tr className="bg-blue-700 text-white sticky top-0 z-10">
                   <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
                   {DRUG_CATALOG_COLUMNS.map(col => (
                     <th key={col.key} className="px-3 py-2 text-left font-semibold whitespace-nowrap">
