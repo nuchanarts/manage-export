@@ -4,9 +4,10 @@ import { BasicConfigPage } from './pages/BasicConfigPage'
 import { EClaimConfigPage } from './pages/EClaimConfigPage'
 import { NhsoLinksPage } from './pages/NhsoLinksPage'
 import { HelpPage } from './pages/HelpPage'
+import { KnowledgePage } from './pages/KnowledgePage'
 import { THEMES, getStoredTheme, storeTheme } from './theme/theme'
 
-type MenuKey = 'validate' | 'basic-config' | 'eclaim-config' | 'nhso-links' | 'help'
+type MenuKey = 'validate' | 'basic-config' | 'eclaim-config' | 'nhso-links' | 'help' | 'knowledge'
 
 interface NavItem {
   key: MenuKey
@@ -73,6 +74,13 @@ const NAV: NavItem[] = [
         icon: '❓',
         label: 'ช่วยเหลือ',
         sublabel: 'คู่มือการใช้งาน',
+        ready: true,
+      },
+      {
+        key: 'knowledge',
+        icon: '📖',
+        label: 'คลังความรู้',
+        sublabel: 'ถาม-ตอบ 43 แฟ้ม',
         ready: true,
       },
     ],
@@ -235,6 +243,7 @@ export function App() {
           {activeMenu === 'basic-config' && <BasicConfigPage />}
           {activeMenu === 'eclaim-config' && <EClaimConfigPage />}
           {activeMenu === 'help' && <HelpPage />}
+          {activeMenu === 'knowledge' && <KnowledgePage />}
         </main>
       </div>
     </div>
