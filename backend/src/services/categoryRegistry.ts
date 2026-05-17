@@ -130,11 +130,11 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     pending: false },
 
   // ── PENDING (pending: true) — mapCol===pk or generic builders cannot express mapping ──
-  // icd101(code PK, name): code IS the icd10 code; no other export/nhso col on master → mapCol===pk [verified 2026-05-17; code3/4/5 are ICD helpers, unrelated]
+  // clinic(clinic PK, name, icd10) -> provis_chronic_icd10(icd10, name_thai)  [owner-specified 2026-05-17: โรคเรื้อรัง = chronic-disease clinics in `clinic`; mapCol icd10 distinct from pk; cols probe-verified]
   { key: 'chronic-disease', label: 'โรคเรื้อรัง',
-    table: 'icd101', pk: 'code', nameCol: 'name', mapCol: 'code',
+    table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'icd10',
     stdTable: 'provis_chronic_icd10', stdCodeCol: 'icd10', stdNameCol: 'name_thai',
-    pending: true },
+    pending: false },
   // clinic(clinic PK, name): clinic code IS pk; no separate nhso/export/std col exists on master [verified 2026-05-17; depcode/oldcode/sss_clinic_code unrelated to nhso_clinic.code]
   { key: 'clinic', label: 'คลินิก',
     table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'clinic',
