@@ -11,11 +11,12 @@ import {
   resolveComboCommit,
   BasicRow,
   StdOption,
+  ExtraFieldMeta,
   SortKey,
   SortDir,
 } from '../../data/basicConfigUtils'
 
-// ─── Menu item type (additive: dual + optional labels) ────────────────────────
+// ─── Menu item type (additive: dual + optional labels + optional extra fields) ─
 interface MenuItem {
   key: string
   label: string
@@ -23,6 +24,7 @@ interface MenuItem {
   dual?: boolean
   field1Label?: string
   field2Label?: string
+  extraFields?: ExtraFieldMeta[]  // additive: present only for N-field categories
 }
 
 // ─── StdCombobox ─────────────────────────────────────────────────────────────
@@ -197,6 +199,8 @@ function DataTable({
   apiBase: string
 }) {
   const isDual = !!menu.dual
+  const extraFields = menu.extraFields ?? []
+  const hasExtra = extraFields.length > 0
   const qc = useQueryClient()
   const { data: rows = [], isLoading, isError } = useQuery({
     queryKey: [apiBase, menu.key],
@@ -215,6 +219,19 @@ function DataTable({
     staleTime: 300_000,
     enabled: isDual,
   })
+  // Extra field options — one query per extra field that has options
+  const extraOptsQueries = extraFields.map((ef, i) =>
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useQuery({
+      queryKey: [`${apiBase}-opts-extra-${i}`, menu.key],
+      queryFn: () =>
+        ef.hasOptions
+          ? axios.get<StdOption[]>(`${apiBase}/${menu.key}/std-options-extra/${i}`).then(r => r.data)
+          : Promise.resolve([] as StdOption[]),
+      staleTime: 300_000,
+      enabled: hasExtra,
+    })
+  )
   const save = useMutation({
     mutationFn: (v: { code: string; std_code: string }) =>
       axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { std_code: v.std_code }),
@@ -223,6 +240,11 @@ function DataTable({
   const save2 = useMutation({
     mutationFn: (v: { code: string; std_code2: string }) =>
       axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { std_code2: v.std_code2 }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [apiBase, menu.key] }),
+  })
+  const saveExtra = useMutation({
+    mutationFn: (v: { code: string; index: number; value: string }) =>
+      axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { extra: { index: v.index, value: v.value } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: [apiBase, menu.key] }),
   })
 
@@ -250,7 +272,8 @@ function DataTable({
   // ── Column resize state ──
   // Default widths (px); persisted to localStorage keyed by apiBase for convenience.
   const STORAGE_KEY = `col-widths:${apiBase}`
-  const defaultWidths = { code: 80, name: 224, std_code: 240, std_code2: 240 }
+  const extraDefaults = Object.fromEntries(extraFields.map((_, i) => [`std_code_e${i}`, 160]))
+  const defaultWidths = { code: 80, name: 224, std_code: 240, std_code2: 240, ...extraDefaults }
   const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
@@ -379,6 +402,9 @@ function DataTable({
             <col style={{ width: colWidths.name }} />
             <col style={{ width: colWidths.std_code }} />
             {isDual && <col style={{ width: colWidths.std_code2 }} />}
+            {extraFields.map((_, i) => (
+              <col key={`ecol-${i}`} style={{ width: colWidths[`std_code_e${i}`] ?? 160 }} />
+            ))}
           </colgroup>
           <thead className="bg-blue-700 text-white">
             <tr>
@@ -427,24 +453,36 @@ function DataTable({
                   />
                 </th>
               )}
+              {extraFields.map((ef, i) => (
+                <th
+                  key={`eth-${i}`}
+                  className="text-left px-3 py-2 font-medium select-none relative"
+                >
+                  {ef.label}
+                  <span
+                    className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-white/30"
+                    onMouseDown={e => startColResize(`std_code_e${i}`, e)}
+                  />
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {displayedRows.length === 0 ? (
-              <tr><td colSpan={isDual ? 4 : 3} className="px-4 py-8 text-center text-gray-400">ไม่พบข้อมูล</td></tr>
+              <tr><td colSpan={3 + (isDual ? 1 : 0) + extraFields.length} className="px-4 py-8 text-center text-gray-400">ไม่พบข้อมูล</td></tr>
             ) : displayedRows.map(row => (
               <tr key={row.code} className={isUnmapped(row) ? 'bg-red-50' : 'bg-white'}>
                 <td className="px-3 py-2 text-gray-700">{row.code}</td>
                 <td className="px-3 py-2 text-gray-700">
                   {isUnmapped(row) && <span className="mr-1 text-red-500" title="ยังไม่ map">⚠</span>}
-                  {row.name}
+                  {row.name as string}
                 </td>
                 <td className="px-3 py-2">
                   {menu.pending ? (
-                    <span className="text-gray-500">{row.std_code ?? '—'}</span>
+                    <span className="text-gray-500">{(row.std_code as string) ?? '—'}</span>
                   ) : (
                     <StdCombobox
-                      value={row.std_code ?? ''}
+                      value={(row.std_code as string) ?? ''}
                       options={opts}
                       onChange={(std_code) => save.mutate({ code: row.code, std_code })}
                     />
@@ -453,16 +491,33 @@ function DataTable({
                 {isDual && (
                   <td className="px-3 py-2">
                     {menu.pending ? (
-                      <span className="text-gray-500">{row.std_code2 ?? '—'}</span>
+                      <span className="text-gray-500">{(row.std_code2 as string) ?? '—'}</span>
                     ) : (
                       <StdCombobox
-                        value={row.std_code2 ?? ''}
+                        value={(row.std_code2 as string) ?? ''}
                         options={opts2}
                         onChange={(std_code2) => save2.mutate({ code: row.code, std_code2 })}
                       />
                     )}
                   </td>
                 )}
+                {extraFields.map((_, i) => {
+                  const val = ((row[`std_code_e${i}`] as string) ?? '')
+                  const extraOpts = extraOptsQueries[i]?.data ?? []
+                  return (
+                    <td key={`etd-${i}`} className="px-3 py-2">
+                      {menu.pending ? (
+                        <span className="text-gray-500">{val || '—'}</span>
+                      ) : (
+                        <StdCombobox
+                          value={val}
+                          options={extraOpts}
+                          onChange={(value) => saveExtra.mutate({ code: row.code, index: i, value })}
+                        />
+                      )}
+                    </td>
+                  )
+                })}
               </tr>
             ))}
           </tbody>

@@ -1,3 +1,12 @@
+/** One extra editable column beyond the primary (+optional secondary) mapping. */
+export interface ExtraFieldDef {
+  mapCol: string        // writable column in `table` (must differ from pk and other mapCols)
+  label: string         // UI column header (Thai)
+  stdTable?: string     // optional std reference table; if omitted → free-value (no options)
+  stdCodeCol?: string   // standard code column in stdTable
+  stdNameCol?: string   // standard name column in stdTable
+}
+
 export interface CategoryDef {
   key: string        // url + query key, e.g. 'occupation'
   label: string      // Thai label shown in the menu
@@ -16,6 +25,8 @@ export interface CategoryDef {
   stdNameCol2?: string    // standard name column in stdTable2
   field1Label?: string    // UI column header for primary mapping
   field2Label?: string    // UI column header for secondary mapping
+  // ── Optional N additional free-value or std-reference columns ────────────
+  extraFields?: ExtraFieldDef[]
 }
 
 // Confirmed against the live HOSxP `demo` schema probe (2026-05-16/17).
@@ -194,6 +205,11 @@ export function getCategory(key: string): CategoryDef | undefined {
   return CATEGORY_REGISTRY.find(c => c.key === key)
 }
 
+export interface ExtraFieldMeta {
+  label: string
+  hasOptions: boolean  // true = has stdTable, false = free-value
+}
+
 export interface CategoryListItem {
   key: string
   label: string
@@ -201,16 +217,20 @@ export interface CategoryListItem {
   dual: boolean
   field1Label?: string
   field2Label?: string
+  extraFields?: ExtraFieldMeta[]  // additive; absent when no extraFields
 }
 
 export function listCategories(): CategoryListItem[] {
-  return CATEGORY_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label }) => ({
+  return CATEGORY_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields }) => ({
     key,
     label,
     pending,
     dual: !!mapCol2,
     ...(field1Label !== undefined ? { field1Label } : {}),
     ...(field2Label !== undefined ? { field2Label } : {}),
+    ...(extraFields && extraFields.length > 0
+      ? { extraFields: extraFields.map(ef => ({ label: ef.label, hasOptions: !!(ef.stdTable && ef.stdCodeCol && ef.stdNameCol) })) }
+      : {}),
   }))
 }
 
@@ -237,8 +257,45 @@ export function buildListSql(c: CategoryDef): string {
       `, ${m}.${ident(c.mapCol2)} AS std_code2` +
       `, (SELECT s2.${ident(c.stdNameCol2)} FROM ${s2} s2 WHERE s2.${ident(c.stdCodeCol2)} = ${m}.${ident(c.mapCol2)} LIMIT 1) AS std_name2`
   }
+  // ── Extra fields (N-field mapping) ──────────────────────────────────────
+  for (let i = 0; i < (c.extraFields?.length ?? 0); i++) {
+    const ef = c.extraFields![i]!
+    sql += `, ${m}.${ident(ef.mapCol)} AS std_code_e${i}`
+    if (ef.stdTable && ef.stdCodeCol && ef.stdNameCol) {
+      const sE = ident(ef.stdTable)
+      sql += `, (SELECT sE${i}.${ident(ef.stdNameCol)} FROM ${sE} sE${i} WHERE sE${i}.${ident(ef.stdCodeCol)} = ${m}.${ident(ef.mapCol)} LIMIT 1) AS std_name_e${i}`
+    }
+  }
   sql += ` FROM ${m} ORDER BY ${m}.${ident(c.pk)}`
   return sql
+}
+
+/**
+ * Returns a SELECT sql for the std reference of extraFields[index], or null if
+ * the field is free-value (no stdTable) or the index is out of range.
+ */
+export function buildStdOptionsSqlExtra(c: CategoryDef, index: number): string | null {
+  const ef = c.extraFields?.[index]
+  if (!ef) return null
+  if (!ef.stdTable || !ef.stdCodeCol || !ef.stdNameCol) return null
+  return (
+    `SELECT ${ident(ef.stdCodeCol)} AS code, ${ident(ef.stdNameCol)} AS name ` +
+    `FROM ${ident(ef.stdTable)} ORDER BY ${ident(ef.stdCodeCol)}`
+  )
+}
+
+/** Builds an UPDATE for extraFields[index]. Throws if index out of range or no extraFields. */
+export function buildUpdateSqlExtra(
+  c: CategoryDef, index: number, code: string, value: string
+): { sql: string; params: (string | null)[] } {
+  const ef = c.extraFields?.[index]
+  if (!ef) {
+    throw new Error(`buildUpdateSqlExtra: category '${c.key}' has no extraFields[${index}]`)
+  }
+  return {
+    sql: `UPDATE ${ident(c.table)} SET ${ident(ef.mapCol)} = ? WHERE ${ident(c.pk)} = ?`,
+    params: [value === '' ? null : value, code],
+  }
 }
 
 export function buildStdOptionsSql(c: CategoryDef): string {

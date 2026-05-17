@@ -1,5 +1,6 @@
 import { getCategory, listCategories, CATEGORY_REGISTRY } from '../../src/services/categoryRegistry'
-import { buildListSql, buildStdOptionsSql, buildUpdateSql, buildStdOptionsSql2, buildUpdateSql2 } from '../../src/services/categoryRegistry'
+import { buildListSql, buildStdOptionsSql, buildUpdateSql, buildStdOptionsSql2, buildUpdateSql2, buildStdOptionsSqlExtra, buildUpdateSqlExtra } from '../../src/services/categoryRegistry'
+import type { CategoryDef } from '../../src/services/categoryRegistry'
 
 describe('category registry', () => {
   it('has occupation fully configured and confirmed', () => {
@@ -178,5 +179,181 @@ describe('dual-field clinic category', () => {
     const list = listCategories()
     const occ = list.find(c => c.key === 'occupation')!
     expect((occ as any).dual).toBe(false)
+  })
+})
+
+// ─── extraFields (N-field mapping) ────────────────────────────────────────────
+describe('extraFields — buildListSql', () => {
+  // A synthetic category with two extra fields: one with stdTable, one free-value
+  const catWithExtra: CategoryDef = {
+    key: 'test-extra',
+    label: 'Test Extra',
+    table: 'nondrugitems',
+    pk: 'icode',
+    nameCol: 'name',
+    mapCol: 'nhso_adp_code',
+    stdTable: 'nhso_adp_code',
+    stdCodeCol: 'nhso_adp_code',
+    stdNameCol: 'nhso_adp_code_name',
+    pending: false,
+    extraFields: [
+      { mapCol: 'billcode', label: 'Bill code' },  // free-value: no stdTable
+      {
+        mapCol: 'nhso_adp_type_id', label: 'ADP type',
+        stdTable: 'nhso_adp_type', stdCodeCol: 'nhso_adp_type_id', stdNameCol: 'nhso_adp_type_name',
+      },
+    ],
+  }
+
+  it('includes std_code_e0 alias for first extra field', () => {
+    const sql = buildListSql(catWithExtra)
+    expect(sql).toContain('AS std_code_e0')
+  })
+
+  it('includes std_code_e1 alias for second extra field', () => {
+    const sql = buildListSql(catWithExtra)
+    expect(sql).toContain('AS std_code_e1')
+  })
+
+  it('does NOT include a correlated subquery for a free-value extra field (no stdTable)', () => {
+    const sql = buildListSql(catWithExtra)
+    // No std_name_e0 because billcode has no stdTable
+    expect(sql).not.toContain('std_name_e0')
+  })
+
+  it('includes correlated subquery std_name_e1 when stdTable is present', () => {
+    const sql = buildListSql(catWithExtra)
+    expect(sql).toContain('AS std_name_e1')
+    expect(sql).toContain('FROM `nhso_adp_type`')
+  })
+
+  it('uses unique aliases sE0, sE1 for extra subquery aliases', () => {
+    const sql = buildListSql(catWithExtra)
+    // The correlated subquery for index 1 uses alias sE1
+    expect(sql).toContain('sE1')
+    // Should not accidentally mix up aliases
+    expect(sql).not.toContain('sE0')  // no subquery for free-value index 0
+  })
+
+  it('is still a single statement (no semicolons mid-query)', () => {
+    const sql = buildListSql(catWithExtra)
+    expect(sql).not.toMatch(/;\s*\S/)
+  })
+
+  it('does not include extra aliases when extraFields is absent (single-field category)', () => {
+    const sql = buildListSql(getCategory('occupation')!)
+    expect(sql).not.toContain('std_code_e')
+    expect(sql).not.toContain('std_name_e')
+  })
+
+  it('does not include extra aliases when extraFields is absent (dual-field category)', () => {
+    const sql = buildListSql(getCategory('clinic')!)
+    expect(sql).not.toContain('std_code_e')
+    expect(sql).not.toContain('std_name_e')
+  })
+})
+
+describe('extraFields — buildStdOptionsSqlExtra', () => {
+  const catFree: CategoryDef = {
+    key: 'test-free',
+    label: 'Test Free',
+    table: 'nondrugitems',
+    pk: 'icode',
+    nameCol: 'name',
+    mapCol: 'billcode',
+    stdTable: 'nhso_adp_code',
+    stdCodeCol: 'nhso_adp_code',
+    stdNameCol: 'nhso_adp_code_name',
+    pending: false,
+    extraFields: [
+      { mapCol: 'billcode', label: 'Bill code' },  // index 0: free-value
+      {
+        mapCol: 'nhso_adp_type_id', label: 'ADP type',
+        stdTable: 'nhso_adp_type', stdCodeCol: 'nhso_adp_type_id', stdNameCol: 'nhso_adp_type_name',
+      },  // index 1: has std reference
+    ],
+  }
+
+  it('returns null for a free-value extra field (no stdTable)', () => {
+    const result = buildStdOptionsSqlExtra(catFree, 0)
+    expect(result).toBeNull()
+  })
+
+  it('returns a SELECT sql for an extra field that has stdTable', () => {
+    const sql = buildStdOptionsSqlExtra(catFree, 1)
+    expect(sql).not.toBeNull()
+    expect(sql).toContain('FROM `nhso_adp_type`')
+    expect(sql).toContain('AS code')
+    expect(sql).toContain('AS name')
+    expect(sql).toContain('ORDER BY')
+  })
+
+  it('returns null for an out-of-range index', () => {
+    const result = buildStdOptionsSqlExtra(catFree, 99)
+    expect(result).toBeNull()
+  })
+
+  it('returns null when extraFields is absent', () => {
+    const result = buildStdOptionsSqlExtra(getCategory('occupation')!, 0)
+    expect(result).toBeNull()
+  })
+})
+
+describe('extraFields — buildUpdateSqlExtra', () => {
+  const catExtra: CategoryDef = {
+    key: 'test-update-extra',
+    label: 'Test',
+    table: 'nondrugitems',
+    pk: 'icode',
+    nameCol: 'name',
+    mapCol: 'nhso_adp_code',
+    stdTable: 'nhso_adp_code',
+    stdCodeCol: 'nhso_adp_code',
+    stdNameCol: 'nhso_adp_code_name',
+    pending: false,
+    extraFields: [
+      { mapCol: 'billcode', label: 'Bill code' },
+      { mapCol: 'sks_coverage_price', label: 'SKS coverage price' },
+    ],
+  }
+
+  it('builds correct UPDATE for extra field index 0', () => {
+    const { sql, params } = buildUpdateSqlExtra(catExtra, 0, 'I001', 'BC99')
+    expect(sql).toBe('UPDATE `nondrugitems` SET `billcode` = ? WHERE `icode` = ?')
+    expect(params).toEqual(['BC99', 'I001'])
+  })
+
+  it('builds correct UPDATE for extra field index 1', () => {
+    const { sql, params } = buildUpdateSqlExtra(catExtra, 1, 'I001', '150.00')
+    expect(sql).toBe('UPDATE `nondrugitems` SET `sks_coverage_price` = ? WHERE `icode` = ?')
+    expect(params).toEqual(['150.00', 'I001'])
+  })
+
+  it('converts empty string value to null (clear mapping)', () => {
+    const { params } = buildUpdateSqlExtra(catExtra, 0, 'I001', '')
+    expect(params[0]).toBeNull()
+  })
+
+  it('throws for out-of-range index', () => {
+    expect(() => buildUpdateSqlExtra(catExtra, 99, 'I001', 'X')).toThrow()
+  })
+
+  it('throws when extraFields is absent', () => {
+    expect(() => buildUpdateSqlExtra(getCategory('occupation')!, 0, 'X', 'Y')).toThrow()
+  })
+})
+
+describe('extraFields — registry integrity for extraFields', () => {
+  const safe = /^[A-Za-z0-9_]+$/
+
+  it('all extraField mapCols in CATEGORY_REGISTRY are safe identifiers', () => {
+    for (const c of CATEGORY_REGISTRY) {
+      for (const ef of c.extraFields ?? []) {
+        expect(ef.mapCol).toMatch(safe)
+        if (ef.stdTable)    expect(ef.stdTable).toMatch(safe)
+        if (ef.stdCodeCol)  expect(ef.stdCodeCol).toMatch(safe)
+        if (ef.stdNameCol)  expect(ef.stdNameCol).toMatch(safe)
+      }
+    }
   })
 })

@@ -95,4 +95,88 @@ describe('eclaim-config routes', () => {
       .send({ std_code: '01' })
     expect(res.status).toBe(404)
   })
+
+  // ── extraFields: eclaim-charge exposes 7 editable columns ─────────────────
+
+  it('GET /api/eclaim-config/eclaim-charge returns rows with std_code_e* keys', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        code: 'I001', name: 'ค่าตรวจ',
+        std_code: null, std_name: null, mapped: 0,
+        std_code_e0: null, std_code_e1: null, std_code_e2: null,
+        std_code_e3: null, std_code_e4: null, std_code_e5: null,
+      }],
+      rowCount: 1,
+    })
+    const res = await request(app).get('/api/eclaim-config/eclaim-charge')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+    // The query was built (mocked) — check that the builder includes extra aliases in the SQL
+    const sqlCalled: string = mockQuery.mock.calls[0][0]
+    expect(sqlCalled).toContain('std_code_e0')
+    expect(sqlCalled).toContain('std_code_e5')
+    // No extra subqueries for free-value fields
+    expect(sqlCalled).not.toContain('std_name_e')
+  })
+
+  it('PUT /api/eclaim-config/eclaim-charge/:code with {extra:{index:0,value:"X"}} updates correct column', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ icode: 'I001' }], rowCount: 1 })  // existence check
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                     // update
+    const res = await request(app)
+      .put('/api/eclaim-config/eclaim-charge/I001')
+      .send({ extra: { index: 0, value: 'X' } })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true })
+    const updateCall = mockQuery.mock.calls[1]
+    // index 0 = first extraField; primary mapCol is nhso_adp_code (keep it for std_code)
+    // Extra fields: billcode(0), nhso_adp_type_id(1), sks_coverage_price(2), enable_sks_opd(3), enable_sks_ipd(4), sks_claim_category_type_id(5)
+    expect(updateCall[0]).toContain('UPDATE `nondrugitems` SET')
+    expect(updateCall[0]).toContain('= ?')
+    expect(updateCall[1][0]).toBe('X')
+    expect(updateCall[1][1]).toBe('I001')
+  })
+
+  it('PUT /api/eclaim-config/eclaim-charge/:code with {extra:{index:0,value:""}} stores null', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ icode: 'I001' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    const res = await request(app)
+      .put('/api/eclaim-config/eclaim-charge/I001')
+      .send({ extra: { index: 0, value: '' } })
+    expect(res.status).toBe(200)
+    const updateCall = mockQuery.mock.calls[1]
+    expect(updateCall[1][0]).toBeNull()
+  })
+
+  it('GET /api/eclaim-config/eclaim-charge/std-options-extra/0 returns 200 (array; free-value → [])', async () => {
+    const res = await request(app).get('/api/eclaim-config/eclaim-charge/std-options-extra/0')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+  })
+
+  it('GET std-options-extra with out-of-range index → 404', async () => {
+    const res = await request(app).get('/api/eclaim-config/eclaim-charge/std-options-extra/99')
+    expect(res.status).toBe(404)
+  })
+
+  it('GET std-options-extra on a category with no extraFields → 404', async () => {
+    const res = await request(app).get('/api/eclaim-config/eclaim-inscl/std-options-extra/0')
+    expect(res.status).toBe(404)
+  })
+
+  it('PUT with {extra} to non-existent code → 404', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }) // existence check returns nothing
+    const res = await request(app)
+      .put('/api/eclaim-config/eclaim-charge/NOTEXIST')
+      .send({ extra: { index: 0, value: 'X' } })
+    expect(res.status).toBe(404)
+  })
+
+  it('PUT with {extra:{index:99}} → 400 (out-of-range)', async () => {
+    const res = await request(app)
+      .put('/api/eclaim-config/eclaim-charge/I001')
+      .send({ extra: { index: 99, value: 'X' } })
+    expect(res.status).toBe(400)
+  })
 })

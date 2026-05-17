@@ -1,14 +1,17 @@
 import {
   CategoryDef,
   CategoryListItem,
+  ExtraFieldMeta,
   buildListSql,
   buildStdOptionsSql,
+  buildStdOptionsSqlExtra,
   buildUpdateSql,
+  buildUpdateSqlExtra,
   buildExistsSql,
 } from './categoryRegistry'
 
 // Re-export the builders so callers of eclaimRegistry can import them from one place
-export { buildListSql, buildStdOptionsSql, buildUpdateSql, buildExistsSql }
+export { buildListSql, buildStdOptionsSql, buildStdOptionsSqlExtra, buildUpdateSql, buildUpdateSqlExtra, buildExistsSql }
 
 // Confirmed against the live HOSxP `demo` schema probe (2026-05-17).
 // pending:false  = master table, pk, nameCol, mapCol, stdTable, stdCodeCol, stdNameCol
@@ -42,11 +45,22 @@ export const ECLAIM_REGISTRY: CategoryDef[] = [
 
   // nondrugitems(icode PK, name, nhso_adp_code) -> nhso_adp_code(nhso_adp_code, nhso_adp_code_name)
   // nhso_adp_code col is distinct from pk 'icode'; JOIN valid; data NULL in demo (operator populates)
-  // [verified 2026-05-17]
+  // 7 editable columns total: primary nhso_adp_code + 6 extra free-value cols (no external std ref)
+  // [verified 2026-05-17; nondrugitems cols: icode,name,billcode,nhso_adp_type_id,nhso_adp_code,
+  //  sks_coverage_price,enable_sks_opd,enable_sks_ipd,sks_claim_category_type_id]
   { key: 'eclaim-charge', label: 'รายการค่ารักษาพยาบาล',
     table: 'nondrugitems', pk: 'icode', nameCol: 'name', mapCol: 'nhso_adp_code',
     stdTable: 'nhso_adp_code', stdCodeCol: 'nhso_adp_code', stdNameCol: 'nhso_adp_code_name',
-    pending: false },
+    pending: false,
+    extraFields: [
+      { mapCol: 'billcode',                    label: 'Bill code' },
+      { mapCol: 'nhso_adp_type_id',            label: 'ADP type' },
+      { mapCol: 'sks_coverage_price',          label: 'SKS coverage price' },
+      { mapCol: 'enable_sks_opd',              label: 'SKS OPD' },
+      { mapCol: 'enable_sks_ipd',              label: 'SKS IPD' },
+      { mapCol: 'sks_claim_category_type_id',  label: 'SKS claim category' },
+    ],
+  },
 
   // ── PENDING (pending: true) — mapCol === pk or std join confirmed as self-referential ─────────
   // aligned with 43-file 'clinic' (DUAL)
@@ -73,12 +87,15 @@ export function getEclaimCategory(key: string): CategoryDef | undefined {
 }
 
 export function listEclaimCategories(): CategoryListItem[] {
-  return ECLAIM_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label }) => ({
+  return ECLAIM_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields }) => ({
     key,
     label,
     pending,
     dual: !!mapCol2,
     ...(field1Label !== undefined ? { field1Label } : {}),
     ...(field2Label !== undefined ? { field2Label } : {}),
+    ...(extraFields && extraFields.length > 0
+      ? { extraFields: extraFields.map((ef): ExtraFieldMeta => ({ label: ef.label, hasOptions: !!(ef.stdTable && ef.stdCodeCol && ef.stdNameCol) })) }
+      : {}),
   }))
 }

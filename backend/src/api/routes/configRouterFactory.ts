@@ -7,14 +7,19 @@ import {
   CategoryListItem,
   buildListSql, buildStdOptionsSql, buildUpdateSql, buildExistsSql,
   buildStdOptionsSql2, buildUpdateSql2,
+  buildStdOptionsSqlExtra, buildUpdateSqlExtra,
 } from '../../services/categoryRegistry'
 
-// Backward-compatible body schema: at least one of std_code or std_code2 must be present
+// Backward-compatible body schema: at least one of std_code, std_code2, or extra must be present
 const bodySchema = z.object({
   std_code:  z.string().max(20).optional(),
   std_code2: z.string().max(20).optional(),
-}).refine(d => d.std_code !== undefined || d.std_code2 !== undefined, {
-  message: 'ต้องระบุ std_code หรือ std_code2',
+  extra: z.object({
+    index: z.number().int().min(0),
+    value: z.string().max(50),
+  }).optional(),
+}).refine(d => d.std_code !== undefined || d.std_code2 !== undefined || d.extra !== undefined, {
+  message: 'ต้องระบุ std_code, std_code2 หรือ extra',
 })
 
 export interface ConfigRegistryFns {
@@ -70,6 +75,26 @@ export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
     } catch (err) { next(err) }
   })
 
+  router.get('/:category/std-options-extra/:index', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const category = String(req.params.category)
+      const c = get(category)
+      if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${category}`)
+      const index = parseInt(String(req.params.index), 10)
+      if (isNaN(index) || !c.extraFields || index < 0 || index >= c.extraFields.length) {
+        throw new AppError(404, 'NOT_FOUND', `ไม่พบ extraField index ${index} สำหรับหมวด ${category}`)
+      }
+      const sql = buildStdOptionsSqlExtra(c, index)
+      if (sql === null) {
+        // free-value: no options table — return empty array gracefully
+        res.json([])
+        return
+      }
+      const { rows } = await query(sql)
+      res.json(rows)
+    } catch (err) { next(err) }
+  })
+
   router.put('/:category/:code', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const category = String(req.params.category)
@@ -79,6 +104,20 @@ export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
       const parsed = bodySchema.safeParse(req.body)
       if (!parsed.success) throw new AppError(400, 'INVALID_BODY', 'ต้องระบุ std_code หรือ std_code2')
       const code = String(req.params.code)
+
+      // extra path: N-field extra column update
+      if (parsed.data.extra !== undefined) {
+        const { index, value } = parsed.data.extra
+        if (!c.extraFields || index < 0 || index >= c.extraFields.length) {
+          throw new AppError(400, 'INVALID_EXTRA_INDEX', `ไม่พบ extraField index ${index} สำหรับหมวด ${category}`)
+        }
+        const exists = await query(buildExistsSql(c), [code])
+        if (exists.rowCount === 0) throw new AppError(404, 'NOT_FOUND', `ไม่พบรหัส: ${code}`)
+        const { sql, params } = buildUpdateSqlExtra(c, index, code, value)
+        await query(sql, params)
+        res.json({ ok: true })
+        return
+      }
 
       // std_code2 path: secondary field update
       if (parsed.data.std_code2 !== undefined) {

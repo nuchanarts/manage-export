@@ -1,3 +1,9 @@
+/** Metadata for one extra editable column (returned by GET / list endpoint). */
+export interface ExtraFieldMeta {
+  label: string
+  hasOptions: boolean
+}
+
 export interface BasicRow {
   code: string
   name: string
@@ -7,6 +13,8 @@ export interface BasicRow {
   // Optional secondary mapping fields (present for dual categories only)
   std_code2?: string | null
   std_name2?: string | null
+  // Optional N-field extra columns — std_code_e0, std_code_e1, …, std_name_e0, …
+  [key: string]: string | null | boolean | undefined
 }
 
 /** Returns true if a row has secondary mapping data (std_code2 key is present) */
@@ -56,16 +64,28 @@ export function autoMatchSuggestions(
 // Filters rows by a free-text query across all code/name fields.
 // Normalises via normalizeName() so Thai diacritics and case are handled uniformly.
 // Empty / whitespace-only query returns ALL rows unchanged.
+// Also searches any extra field columns (std_code_e0, std_name_e0, …) present on the row.
 export function filterRows(rows: BasicRow[], query: string): BasicRow[] {
   const q = normalizeName(query)
   if (!q) return rows
-  return rows.filter(r =>
-    r.code.toLowerCase().includes(q) ||
-    normalizeName(r.name).includes(q) ||
-    normalizeName(r.std_code ?? '').includes(q) ||
-    normalizeName(r.std_name ?? '').includes(q) ||
-    normalizeName(r.std_code2 ?? '').includes(q) ||
-    normalizeName(r.std_name2 ?? '').includes(q))
+  return rows.filter(r => {
+    if (
+      r.code.toLowerCase().includes(q) ||
+      normalizeName(r.name as string).includes(q) ||
+      normalizeName((r.std_code as string) ?? '').includes(q) ||
+      normalizeName((r.std_name as string) ?? '').includes(q) ||
+      normalizeName((r.std_code2 as string) ?? '').includes(q) ||
+      normalizeName((r.std_name2 as string) ?? '').includes(q)
+    ) return true
+    // Search extra fields dynamically
+    let i = 0
+    while (`std_code_e${i}` in r) {
+      if (normalizeName((r[`std_code_e${i}`] as string) ?? '').includes(q)) return true
+      if (normalizeName((r[`std_name_e${i}`] as string) ?? '').includes(q)) return true
+      i++
+    }
+    return false
+  })
 }
 
 /**
