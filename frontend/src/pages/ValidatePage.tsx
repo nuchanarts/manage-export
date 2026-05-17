@@ -13,6 +13,108 @@ import {
   setValidateSession,
 } from '../data/validateStore'
 
+function SchemaPanel({ fields, fileName, description, fileMeta, compact }: {
+  fields: SchemaFieldSummary[]
+  fileName: string
+  description: string
+  fileMeta: FileMetaFull
+  compact?: boolean
+}) {
+  const required = fields.filter(f => f.notNull)
+  const optional = fields.filter(f => !f.notNull)
+  const TYPE_LABEL: Record<string, string> = { C: 'ข้อความ', N: 'ตัวเลข', D: 'วันที่', DT: 'วันเวลา' }
+
+  return (
+    <>
+      <div className="bg-blue-800 text-white px-3 py-2.5">
+        <p className="font-bold text-sm">
+          {fileMeta.fileNumber > 0 ? `(${fileMeta.fileNumber}) ` : ''}{fileName}
+          <span className="ml-1.5 text-[11px] font-normal text-blue-300">version 3.1.1</span>
+        </p>
+        {fileMeta.definition && (
+          <p className="text-xs text-blue-100 mt-0.5 leading-relaxed">{fileMeta.definition}</p>
+        )}
+        {!fileMeta.definition && description && (
+          <p className="text-xs text-blue-100 mt-0.5">{description}</p>
+        )}
+        <div className="flex flex-wrap gap-1.5 mt-1.5">
+          {fileMeta.fileType && <span className="bg-blue-600 px-2 py-0.5 rounded text-[11px]">📁 {fileTypeLabel(fileMeta.fileType)}</span>}
+          {fileMeta.units && <span className="bg-blue-600 px-2 py-0.5 rounded text-[11px]">🏥 {fileMeta.units}</span>}
+        </div>
+        <p className="text-[11px] text-blue-300 mt-1.5">{fields.length} คอลัมน์ · ห้ามว่าง {required.length} · ไม่บังคับ {optional.length}</p>
+      </div>
+
+      {/* Rich metadata section */}
+      {(fileMeta.scope.length > 0 || fileMeta.period.length > 0) && (
+        <div className="border-b border-gray-100 px-3 py-2 space-y-1.5 bg-gray-50 text-xs text-gray-700">
+          {fileMeta.scope.length > 0 && (
+            <div>
+              <p className="font-semibold text-gray-800 mb-0.5">ขอบเขตข้อมูล:</p>
+              {(compact ? fileMeta.scope.slice(0, 4) : fileMeta.scope).map((s, i) => <p key={i} className="leading-snug">{s}</p>)}
+              {compact && fileMeta.scope.length > 4 && <p className="text-gray-400">...และอีก {fileMeta.scope.length - 4} รายการ</p>}
+            </div>
+          )}
+          {fileMeta.period.length > 0 && (
+            <div>
+              <p className="font-semibold text-gray-800 mb-0.5">เวลา/รอบที่บันทึก:</p>
+              {(compact ? fileMeta.period.slice(0, 3) : fileMeta.period).map((s, i) => <p key={i} className="leading-snug">{s}</p>)}
+              {compact && fileMeta.period.length > 3 && <p className="text-gray-400">...และอีก {fileMeta.period.length - 3} รายการ</p>}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={compact ? 'overflow-y-auto' : 'max-h-[60vh] overflow-y-auto'} style={compact ? { maxHeight: 420 } : undefined}>
+        {required.length > 0 && (
+          <>
+            <div className="px-3 py-1.5 bg-red-50 border-b border-red-100 sticky top-0">
+              <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5" />
+              <span className="text-xs font-semibold text-red-700">ห้ามว่าง (NOT NULL) — {required.length} คอลัมน์</span>
+            </div>
+            <table className="min-w-full text-xs">
+              <tbody>
+                {required.map(f => (
+                  <tr key={f.name} className="border-b border-red-50 hover:bg-red-50">
+                    <td className="pl-3 pr-1 py-1.5 w-6 text-yellow-500 text-[10px] font-bold">{f.pk ? 'PK' : ''}</td>
+                    <td className="px-2 py-1.5 font-mono font-semibold text-red-800 whitespace-nowrap">{f.name}</td>
+                    <td className="px-2 py-1.5 text-gray-700">{f.caption}</td>
+                    <td className="px-2 py-1.5 text-gray-400 whitespace-nowrap">{TYPE_LABEL[f.type] ?? f.type}({f.width})</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {optional.length > 0 && (
+          <>
+            <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 sticky top-0">
+              <span className="inline-block w-2 h-2 rounded-full bg-gray-400 mr-1.5" />
+              <span className="text-xs font-semibold text-gray-500">ไม่บังคับ — {optional.length} คอลัมน์</span>
+            </div>
+            <table className="min-w-full text-xs">
+              <tbody>
+                {optional.map(f => (
+                  <tr key={f.name} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="pl-3 pr-1 py-1.5 w-6 text-yellow-500 text-[10px] font-bold">{f.pk ? 'PK' : ''}</td>
+                    <td className="px-2 py-1.5 font-mono text-gray-600 whitespace-nowrap">{f.name}</td>
+                    <td className="px-2 py-1.5 text-gray-500">{f.caption}</td>
+                    <td className="px-2 py-1.5 text-gray-400 whitespace-nowrap">{TYPE_LABEL[f.type] ?? f.type}({f.width})</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {fields.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-6">ไม่พบข้อมูลโครงสร้างในมาตรฐาน</p>
+        )}
+      </div>
+    </>
+  )
+}
+
 function SchemaTooltip({ fields, fileName, description, fileMeta }: {
   fields: SchemaFieldSummary[]
   fileName: string
@@ -21,9 +123,6 @@ function SchemaTooltip({ fields, fileName, description, fileMeta }: {
 }) {
   const [show, setShow] = useState(false)
   const [pos, setPos] = useState({ x: 0, y: 0 })
-  const required = fields.filter(f => f.notNull)
-  const optional = fields.filter(f => !f.notNull)
-  const TYPE_LABEL: Record<string, string> = { C: 'ข้อความ', N: 'ตัวเลข', D: 'วันที่', DT: 'วันเวลา' }
 
   return (
     <span
@@ -45,91 +144,7 @@ function SchemaTooltip({ fields, fileName, description, fileMeta }: {
           onMouseEnter={() => setShow(true)}
           onMouseLeave={() => setShow(false)}
         >
-          <div className="bg-blue-800 text-white px-3 py-2.5">
-            <p className="font-bold text-sm">
-              {fileMeta.fileNumber > 0 ? `(${fileMeta.fileNumber}) ` : ''}{fileName}
-              <span className="ml-1.5 text-[11px] font-normal text-blue-300">version 3.1.1</span>
-            </p>
-            {fileMeta.definition && (
-              <p className="text-xs text-blue-100 mt-0.5 leading-relaxed">{fileMeta.definition}</p>
-            )}
-            {!fileMeta.definition && description && (
-              <p className="text-xs text-blue-100 mt-0.5">{description}</p>
-            )}
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {fileMeta.fileType && <span className="bg-blue-600 px-2 py-0.5 rounded text-[11px]">📁 {fileTypeLabel(fileMeta.fileType)}</span>}
-              {fileMeta.units && <span className="bg-blue-600 px-2 py-0.5 rounded text-[11px]">🏥 {fileMeta.units}</span>}
-            </div>
-            <p className="text-[11px] text-blue-300 mt-1.5">{fields.length} คอลัมน์ · ห้ามว่าง {required.length} · ไม่บังคับ {optional.length}</p>
-          </div>
-
-          {/* Rich metadata section */}
-          {(fileMeta.scope.length > 0 || fileMeta.period.length > 0) && (
-            <div className="border-b border-gray-100 px-3 py-2 space-y-1.5 bg-gray-50 text-xs text-gray-700">
-              {fileMeta.scope.length > 0 && (
-                <div>
-                  <p className="font-semibold text-gray-800 mb-0.5">ขอบเขตข้อมูล:</p>
-                  {fileMeta.scope.slice(0, 4).map((s, i) => <p key={i} className="leading-snug">{s}</p>)}
-                  {fileMeta.scope.length > 4 && <p className="text-gray-400">...และอีก {fileMeta.scope.length - 4} รายการ</p>}
-                </div>
-              )}
-              {fileMeta.period.length > 0 && (
-                <div>
-                  <p className="font-semibold text-gray-800 mb-0.5">เวลา/รอบที่บันทึก:</p>
-                  {fileMeta.period.slice(0, 3).map((s, i) => <p key={i} className="leading-snug">{s}</p>)}
-                  {fileMeta.period.length > 3 && <p className="text-gray-400">...และอีก {fileMeta.period.length - 3} รายการ</p>}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="overflow-y-auto" style={{ maxHeight: 420 }}>
-            {required.length > 0 && (
-              <>
-                <div className="px-3 py-1.5 bg-red-50 border-b border-red-100 sticky top-0">
-                  <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5" />
-                  <span className="text-xs font-semibold text-red-700">ห้ามว่าง (NOT NULL) — {required.length} คอลัมน์</span>
-                </div>
-                <table className="min-w-full text-xs">
-                  <tbody>
-                    {required.map(f => (
-                      <tr key={f.name} className="border-b border-red-50 hover:bg-red-50">
-                        <td className="pl-3 pr-1 py-1.5 w-6 text-yellow-500 text-[10px] font-bold">{f.pk ? 'PK' : ''}</td>
-                        <td className="px-2 py-1.5 font-mono font-semibold text-red-800 whitespace-nowrap">{f.name}</td>
-                        <td className="px-2 py-1.5 text-gray-700">{f.caption}</td>
-                        <td className="px-2 py-1.5 text-gray-400 whitespace-nowrap">{TYPE_LABEL[f.type] ?? f.type}({f.width})</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-
-            {optional.length > 0 && (
-              <>
-                <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 sticky top-0">
-                  <span className="inline-block w-2 h-2 rounded-full bg-gray-400 mr-1.5" />
-                  <span className="text-xs font-semibold text-gray-500">ไม่บังคับ — {optional.length} คอลัมน์</span>
-                </div>
-                <table className="min-w-full text-xs">
-                  <tbody>
-                    {optional.map(f => (
-                      <tr key={f.name} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="pl-3 pr-1 py-1.5 w-6 text-yellow-500 text-[10px] font-bold">{f.pk ? 'PK' : ''}</td>
-                        <td className="px-2 py-1.5 font-mono text-gray-600 whitespace-nowrap">{f.name}</td>
-                        <td className="px-2 py-1.5 text-gray-500">{f.caption}</td>
-                        <td className="px-2 py-1.5 text-gray-400 whitespace-nowrap">{TYPE_LABEL[f.type] ?? f.type}({f.width})</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-
-            {fields.length === 0 && (
-              <p className="text-xs text-gray-400 text-center py-6">ไม่พบข้อมูลโครงสร้างในมาตรฐาน</p>
-            )}
-          </div>
+          <SchemaPanel fields={fields} fileName={fileName} description={description} fileMeta={fileMeta} compact />
         </div>
       )}
     </span>
@@ -173,7 +188,7 @@ const ERR_TYPE_LABEL: Record<string, string> = {
 }
 
 function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospcode: string; onClose: () => void }) {
-  const [tab, setTab] = useState<'incomplete' | 'fail' | 'pass' | 'field'>(file.status === 'PASS' ? 'pass' : 'incomplete')
+  const [tab, setTab] = useState<'incomplete' | 'fail' | 'pass' | 'field' | 'schema'>(file.status === 'PASS' ? 'pass' : 'incomplete')
   const [exporting, setExporting] = useState(false)
 
   const handleExportExcel = async () => {
@@ -276,7 +291,7 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
           </div>
           <div className="flex items-center gap-2 ml-4">
             <button onClick={handlePrint} className="px-3 py-1.5 bg-white text-blue-800 text-xs font-medium rounded hover:bg-blue-50 transition-colors">🖨 พิมพ์</button>
-            <button onClick={handleExportExcel} disabled={exporting || (tab === 'pass' ? file.personPass.length === 0 : tab === 'incomplete' ? !file.personErrors.some(p => p.errors.some(e => e.type === 'NULL_REQUIRED')) : tab === 'fail' ? file.personErrors.length === 0 : false)}
+            <button onClick={handleExportExcel} disabled={exporting || tab === 'schema' || (tab === 'pass' ? file.personPass.length === 0 : tab === 'incomplete' ? !file.personErrors.some(p => p.errors.some(e => e.type === 'NULL_REQUIRED')) : tab === 'fail' ? file.personErrors.length === 0 : false)}
               className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-medium rounded transition-colors">
               {exporting ? '...' : '⬇ Excel'}
             </button>
@@ -353,8 +368,9 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
                 { key: 'fail', label: `❌ ไม่ผ่านทั้งหมด (${file.failPersons} คน)`, color: file.failPersons > 0 ? 'text-red-700 border-red-600' : '' },
                 { key: 'pass', label: `✅ ผ่าน (${file.passPersons} คน)`, color: 'text-green-700 border-green-600' },
                 { key: 'field', label: `🔍 สรุปตามฟิลด์ (${Object.keys(byField).length})`, color: '' },
+                { key: 'schema', label: '🗂️ โครงสร้างแฟ้ม', color: '' },
               ].map(t => (
-                <button key={t.key} onClick={() => setTab(t.key as 'incomplete' | 'fail' | 'pass' | 'field')}
+                <button key={t.key} onClick={() => setTab(t.key as 'incomplete' | 'fail' | 'pass' | 'field' | 'schema')}
                   className={`px-3 py-1.5 text-sm rounded-t-lg border-b-2 font-medium transition-colors ${tab === t.key ? (t.color || 'text-blue-700 border-blue-700') : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                   {t.label}
                 </button>
@@ -501,6 +517,18 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
                   แสดง 500 รายการแรก จากทั้งหมด {file.passPersons.toLocaleString()} คน
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Tab: Schema structure */}
+          {tab === 'schema' && (
+            <div className="mt-3 rounded-lg border border-gray-200 overflow-hidden">
+              <SchemaPanel
+                fields={file.schemaFields ?? []}
+                fileName={file.fileName}
+                description={file.description}
+                fileMeta={file.fileMeta ?? { fileNumber: 0, fileType: '', units: '', definition: '', scope: [], period: [], notes: [], related: [], hisGuide: null }}
+              />
             </div>
           )}
 
