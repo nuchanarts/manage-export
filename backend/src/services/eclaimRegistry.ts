@@ -24,6 +24,7 @@ export const ECLAIM_REGISTRY: CategoryDef[] = [
     stdTable: 'nhso_inscl_code', stdCodeCol: 'inscl_code', stdNameCol: 'inscl_name',
     pending: false },
 
+  // aligned with 43-file 'marriage'
   // marrystatus(code PK, name, nhso_marriage_code) -> nhso_marriage(nhso_marriage_code, nhso_marriage_name)
   // [verified 2026-05-17; same tables as basic-config 'marriage']
   { key: 'eclaim-marriage', label: 'สถานะสมรส',
@@ -31,11 +32,12 @@ export const ECLAIM_REGISTRY: CategoryDef[] = [
     stdTable: 'nhso_marriage', stdCodeCol: 'nhso_marriage_code', stdNameCol: 'nhso_marriage_name',
     pending: false },
 
-  // drugitems(icode PK, name, tmt_tp_code) -> tmt_tp_code(tp_code, tp_name)
-  // [verified 2026-05-17; same tables as basic-config 'drug-list'; tmt_tp_code distinct from pk icode]
+  // aligned with 43-file 'drug-list'
+  // drugitems(icode PK, name, did=24-digit std code) -> drugitems_register(std_code, drugname)
+  // [owner-specified 2026-05-17; same mapping as basic-config 'drug-list']
   { key: 'eclaim-drug-list', label: 'รายการยา',
-    table: 'drugitems', pk: 'icode', nameCol: 'name', mapCol: 'tmt_tp_code',
-    stdTable: 'tmt_tp_code', stdCodeCol: 'tp_code', stdNameCol: 'tp_name',
+    table: 'drugitems', pk: 'icode', nameCol: 'name', mapCol: 'did',
+    stdTable: 'drugitems_register', stdCodeCol: 'std_code', stdNameCol: 'drugname',
     pending: false },
 
   // nondrugitems(icode PK, name, nhso_adp_code) -> nhso_adp_code(nhso_adp_code, nhso_adp_code_name)
@@ -46,14 +48,18 @@ export const ECLAIM_REGISTRY: CategoryDef[] = [
     stdTable: 'nhso_adp_code', stdCodeCol: 'nhso_adp_code', stdNameCol: 'nhso_adp_code_name',
     pending: false },
 
-  // ── PENDING (pending: true) — mapCol === pk or no external std col ────────────
-  // clinic(clinic PK, name): no separate eclaim/nhso mapping col distinct from pk
-  // depcode/sss_clinic_code/pcu_code are unrelated to nhso_clinic.code [verified 2026-05-17]
+  // ── PENDING (pending: true) — mapCol === pk or std join confirmed as self-referential ─────────
+  // aligned with 43-file 'clinic' (DUAL)
+  // clinic(clinic PK, name, icd10, oapp_activity_id) -> icd101(code,name) + oapp_activity(oapp_activity_id, oapp_activity_name)
+  // [probe-verified 2026-05-17; mapCol icd10 and mapCol2 oapp_activity_id both distinct from pk]
   { key: 'eclaim-clinic', label: 'คลินิก',
-    table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'clinic',
-    stdTable: 'nhso_clinic', stdCodeCol: 'code', stdNameCol: 'name',
-    pending: true },
+    table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'icd10',
+    stdTable: 'icd101', stdCodeCol: 'code', stdNameCol: 'name',
+    mapCol2: 'oapp_activity_id', stdTable2: 'oapp_activity', stdCodeCol2: 'oapp_activity_id', stdNameCol2: 'oapp_activity_name',
+    field1Label: 'ประเภทโรค', field2Label: 'ประเภทกิจกรรม',
+    pending: false },
 
+  // aligned with 43-file 'drug-ned-reason'
   // drugitems_ned_reason_list: claim_control IS pk; only 4 cols; no external std table
   // [verified 2026-05-17; self-referential; same conclusion as basic-config 'drug-ned-reason']
   { key: 'eclaim-drug-ned', label: 'เหตุผลการสั่งยา NED',

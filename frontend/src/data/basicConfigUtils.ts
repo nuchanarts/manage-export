@@ -53,6 +53,21 @@ export function autoMatchSuggestions(
   return out
 }
 
+// Filters rows by a free-text query across all code/name fields.
+// Normalises via normalizeName() so Thai diacritics and case are handled uniformly.
+// Empty / whitespace-only query returns ALL rows unchanged.
+export function filterRows(rows: BasicRow[], query: string): BasicRow[] {
+  const q = normalizeName(query)
+  if (!q) return rows
+  return rows.filter(r =>
+    r.code.toLowerCase().includes(q) ||
+    normalizeName(r.name).includes(q) ||
+    normalizeName(r.std_code ?? '').includes(q) ||
+    normalizeName(r.std_name ?? '').includes(q) ||
+    normalizeName(r.std_code2 ?? '').includes(q) ||
+    normalizeName(r.std_name2 ?? '').includes(q))
+}
+
 export type SortKey = 'code' | 'name' | 'std_code' | 'std_code2'
 export type SortDir = 'asc' | 'desc'
 

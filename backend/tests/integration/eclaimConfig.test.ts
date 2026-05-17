@@ -45,23 +45,23 @@ describe('eclaim-config routes', () => {
   })
 
   it('PUT to a pending eclaim category → 400 PENDING_CATEGORY (no DB call)', async () => {
-    // eclaim-clinic is pending:true
-    const res = await request(app)
-      .put('/api/eclaim-config/eclaim-clinic/001')
-      .send({ std_code: '01' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toBe('PENDING_CATEGORY')
-    expect(mockQuery).not.toHaveBeenCalled()
-  })
-
-  it('PUT to another pending eclaim category → 400 PENDING_CATEGORY', async () => {
-    // eclaim-drug-ned is pending:true
+    // 'eclaim-drug-ned' is pending:true (self-referential std table)
     const res = await request(app)
       .put('/api/eclaim-config/eclaim-drug-ned/EA')
       .send({ std_code: 'EA' })
     expect(res.status).toBe(400)
     expect(res.body.error).toBe('PENDING_CATEGORY')
     expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('eclaim-clinic is now non-pending (aligned with 43-file clinic): GET returns rows', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ code: 'CLI01', name: 'คลินิกเบาหวาน', std_code: 'E11', std_name: null, mapped: 0 }],
+      rowCount: 1,
+    })
+    const res = await request(app).get('/api/eclaim-config/eclaim-clinic')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
   })
 
   it('PUT valid eclaim category (mock existence + update) → {ok:true}', async () => {

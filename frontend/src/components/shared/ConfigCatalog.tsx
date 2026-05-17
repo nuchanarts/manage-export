@@ -5,6 +5,7 @@ import {
   isUnmapped,
   summarize,
   filterOptions,
+  filterRows,
   autoMatchSuggestions,
   sortRows,
   BasicRow,
@@ -200,6 +201,9 @@ function DataTable({
   // ── Filter toggle state ──
   const [showUnmappedOnly, setShowUnmappedOnly] = useState(false)
 
+  // ── Row search state ──
+  const [rowQuery, setRowQuery] = useState('')
+
   // ── Sort state ──
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null)
 
@@ -225,9 +229,10 @@ function DataTable({
   // Summary always over full rows (not filtered)
   const s = summarize(rows)
 
-  // Displayed rows respect the filter toggle, then optionally sorted
-  const filteredRows = showUnmappedOnly ? rows.filter(isUnmapped) : rows
-  const displayedRows = sort ? sortRows(filteredRows, sort.key, sort.dir) : filteredRows
+  // Displayed rows: unmapped filter → row search → sort
+  const afterUnmappedFilter = showUnmappedOnly ? rows.filter(isUnmapped) : rows
+  const afterSearch = filterRows(afterUnmappedFilter, rowQuery)
+  const displayedRows = sort ? sortRows(afterSearch, sort.key, sort.dir) : afterSearch
 
   async function handleAutoMatch() {
     setAutoMatchMsg(null)
@@ -264,32 +269,43 @@ function DataTable({
         </div>
       )}
 
-      {/* Controls bar — only for non-pending */}
-      {!menu.pending && (
-        <div className="px-4 py-2 border-b flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={showUnmappedOnly}
-              onChange={e => setShowUnmappedOnly(e.target.checked)}
-              className="accent-blue-600"
-            />
-            แสดงเฉพาะที่ยังไม่ map
-          </label>
+      {/* Controls bar — search always visible; edit controls only for non-pending */}
+      <div className="px-4 py-2 border-b flex flex-wrap items-center gap-4">
+        <input
+          type="text"
+          value={rowQuery}
+          onChange={e => setRowQuery(e.target.value)}
+          placeholder="ค้นหารายการ..."
+          className="border border-gray-300 rounded px-2 py-1 text-sm w-52"
+          aria-label="ค้นหารายการ"
+        />
 
-          <button
-            onClick={handleAutoMatch}
-            disabled={matching}
-            className="px-3 py-1 text-sm rounded border border-blue-600 text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {matching ? 'กำลังจับคู่...' : 'จับคู่อัตโนมัติ'}
-          </button>
+        {!menu.pending && (
+          <>
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showUnmappedOnly}
+                onChange={e => setShowUnmappedOnly(e.target.checked)}
+                className="accent-blue-600"
+              />
+              แสดงเฉพาะที่ยังไม่ map
+            </label>
 
-          {autoMatchMsg && (
-            <span className="text-sm text-gray-600">{autoMatchMsg}</span>
-          )}
-        </div>
-      )}
+            <button
+              onClick={handleAutoMatch}
+              disabled={matching}
+              className="px-3 py-1 text-sm rounded border border-blue-600 text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {matching ? 'กำลังจับคู่...' : 'จับคู่อัตโนมัติ'}
+            </button>
+
+            {autoMatchMsg && (
+              <span className="text-sm text-gray-600">{autoMatchMsg}</span>
+            )}
+          </>
+        )}
+      </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">

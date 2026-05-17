@@ -165,11 +165,6 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     table: 'diagtype', pk: 'diagtype', nameCol: 'name', mapCol: 'nhso_code',
     stdTable: 'provis_diagtype', stdCodeCol: 'code', stdNameCol: 'name',
     pending: false },
-  // pcode(code PK, name): only cols are code, name, age_min, age_max — no separate export col; provis_person is per-person export, not a code ref [verified 2026-05-17; mapCol===pk]
-  { key: 'person-type', label: 'ประเภทบุคคล',
-    table: 'pcode', pk: 'code', nameCol: 'name', mapCol: 'code',
-    stdTable: 'provis_person', stdCodeCol: 'typearea', stdNameCol: 'name',
-    pending: true },
   // accident_place_type(accident_place_type_id PK, accident_place_type_name, export_code) -> provis_aeplace(code, name): export_code col distinct from pk; schema valid; NULL in demo [verified 2026-05-17]
   { key: 'accident-place', label: 'สถานที่เกิดอุบัติเหตุ',
     table: 'accident_place_type', pk: 'accident_place_type_id', nameCol: 'accident_place_type_name', mapCol: 'export_code',
@@ -225,26 +220,21 @@ function ident(name: string): string {
 export function buildListSql(c: CategoryDef): string {
   const m = ident(c.table)
   const s = ident(c.stdTable)
+  // Use correlated scalar subqueries instead of LEFT JOIN so that std tables with
+  // non-unique stdCodeCol (e.g. drugitems_register) never multiply master rows.
   let sql =
     `SELECT ${m}.${ident(c.pk)} AS code, ` +
     `${m}.${ident(c.nameCol)} AS name, ` +
     `${m}.${ident(c.mapCol)} AS std_code, ` +
-    `${s}.${ident(c.stdNameCol)} AS std_name, ` +
-    `(${s}.${ident(c.stdCodeCol)} IS NOT NULL) AS mapped`
+    `(SELECT s.${ident(c.stdNameCol)} FROM ${s} s WHERE s.${ident(c.stdCodeCol)} = ${m}.${ident(c.mapCol)} LIMIT 1) AS std_name, ` +
+    `(EXISTS(SELECT 1 FROM ${s} s WHERE s.${ident(c.stdCodeCol)} = ${m}.${ident(c.mapCol)})) AS mapped`
   if (c.mapCol2 && c.stdTable2 && c.stdCodeCol2 && c.stdNameCol2) {
     const s2 = ident(c.stdTable2)
     sql +=
       `, ${m}.${ident(c.mapCol2)} AS std_code2` +
-      `, ${s2}.${ident(c.stdNameCol2)} AS std_name2`
+      `, (SELECT s2.${ident(c.stdNameCol2)} FROM ${s2} s2 WHERE s2.${ident(c.stdCodeCol2)} = ${m}.${ident(c.mapCol2)} LIMIT 1) AS std_name2`
   }
-  sql +=
-    ` FROM ${m} ` +
-    `LEFT JOIN ${s} ON ${m}.${ident(c.mapCol)} = ${s}.${ident(c.stdCodeCol)}`
-  if (c.mapCol2 && c.stdTable2 && c.stdCodeCol2) {
-    const s2 = ident(c.stdTable2)
-    sql += ` LEFT JOIN ${s2} ON ${m}.${ident(c.mapCol2)} = ${s2}.${ident(c.stdCodeCol2!)}`
-  }
-  sql += ` ORDER BY ${m}.${ident(c.pk)}`
+  sql += ` FROM ${m} ORDER BY ${m}.${ident(c.pk)}`
   return sql
 }
 

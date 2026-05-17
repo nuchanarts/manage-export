@@ -30,12 +30,26 @@ describe('category registry', () => {
 describe('SQL builders', () => {
   const occ = getCategory('occupation')!
 
-  it('buildListSql LEFT JOINs the standard table and flags mapped', () => {
+  it('buildListSql uses correlated subqueries (no LEFT JOIN) and flags mapped', () => {
     const sql = buildListSql(occ)
+    // Master table is the FROM target
     expect(sql).toContain('FROM `occupation`')
-    expect(sql).toContain('LEFT JOIN `provis_occupa`')
-    expect(sql).toContain('`occupation`.`nhso_code`')
-    expect(sql).not.toMatch(/;\s*\S/) // single statement, no stacked queries
+    // No LEFT JOIN — uses correlated subqueries instead
+    expect(sql).not.toContain('LEFT JOIN')
+    // Primary mapping column backtick-quoted via ident()
+    expect(sql).toContain('`nhso_code`')
+    // std_name resolved via correlated SELECT … LIMIT 1
+    expect(sql).toContain('LIMIT 1) AS std_name')
+    // mapped resolved via EXISTS(…)
+    expect(sql).toContain('EXISTS(SELECT 1 FROM `provis_occupa`')
+    // Required output aliases present
+    expect(sql).toContain('AS std_code,')
+    expect(sql).toContain('AS std_name,')
+    expect(sql).toContain('AS mapped')
+    // ORDER BY present
+    expect(sql).toContain('ORDER BY')
+    // Single statement; no stacked queries
+    expect(sql).not.toMatch(/;\s*\S/)
   })
 
   it('buildStdOptionsSql selects code+name from the provis table', () => {
@@ -104,14 +118,22 @@ describe('dual-field clinic category', () => {
     expect(clinic.stdNameCol).toBe('name')
   })
 
-  it('buildListSql for a dual category includes std_code2/std_name2 and second LEFT JOIN', () => {
+  it('buildListSql for a dual category includes std_code2/std_name2 as correlated subqueries', () => {
     const sql = buildListSql(clinic)
+    // Secondary alias present
     expect(sql).toContain('std_code2')
     expect(sql).toContain('std_name2')
-    expect(sql).toContain('LEFT JOIN `oapp_activity`')
-    // primary join still present
-    expect(sql).toContain('LEFT JOIN `icd101`')
+    // Secondary correlated subquery references oapp_activity
+    expect(sql).toContain('FROM `oapp_activity`')
+    // Primary correlated subquery references icd101
+    expect(sql).toContain('FROM `icd101`')
+    // Master table is FROM target (no LEFT JOIN)
     expect(sql).toContain('FROM `clinic`')
+    expect(sql).not.toContain('LEFT JOIN')
+    // ORDER BY present
+    expect(sql).toContain('ORDER BY')
+    // Single statement
+    expect(sql).not.toMatch(/;\s*\S/)
   })
 
   it('buildListSql dual still has std_code/std_name/mapped from primary', () => {
