@@ -1,8 +1,152 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { isUnmapped, summarize, BasicRow } from '../data/basicConfigUtils'
+import {
+  isUnmapped,
+  summarize,
+  filterOptions,
+  autoMatchSuggestions,
+  BasicRow,
+  StdOption,
+} from '../data/basicConfigUtils'
 
+// ─── StdCombobox ─────────────────────────────────────────────────────────────
+function StdCombobox({
+  value,
+  options,
+  onChange,
+}: {
+  value: string
+  options: StdOption[]
+  onChange: (code: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Label for the currently selected value
+  const selectedLabel = value
+    ? (() => {
+        const found = options.find(o => o.code === value)
+        return found ? `${found.code} — ${found.name}` : value
+      })()
+    : ''
+
+  // Filtered options capped at 200 for perf
+  const filtered = filterOptions(options, query).slice(0, 200)
+
+  function openDropdown() {
+    setQuery('')
+    setOpen(true)
+  }
+
+  function closeDropdown() {
+    setOpen(false)
+    setQuery('')
+  }
+
+  function selectItem(code: string) {
+    onChange(code)
+    closeDropdown()
+  }
+
+  function handleFocus() {
+    if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+    openDropdown()
+  }
+
+  function handleBlur() {
+    blurTimerRef.current = setTimeout(() => {
+      closeDropdown()
+    }, 150)
+  }
+
+  function handleListMouseDown(e: React.MouseEvent) {
+    // Prevent the input blur from firing before the click resolves
+    e.preventDefault()
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') {
+      closeDropdown()
+      inputRef.current?.blur()
+    } else if (e.key === 'Enter') {
+      if (filtered.length > 0) {
+        selectItem(filtered[0]!.code)
+        inputRef.current?.blur()
+      }
+    } else if (!open) {
+      openDropdown()
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+    }
+  }, [])
+
+  return (
+    <div className="relative w-full max-w-md">
+      <input
+        ref={inputRef}
+        type="text"
+        className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
+        placeholder={selectedLabel || '— ยังไม่ map —'}
+        value={open ? query : selectedLabel}
+        onChange={e => {
+          setQuery(e.target.value)
+          if (!open) setOpen(true)
+        }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        autoComplete="off"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      />
+      {open && (
+        <ul
+          ref={listRef}
+          role="listbox"
+          onMouseDown={handleListMouseDown}
+          className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto text-sm"
+        >
+          {/* Explicit "no mapping" option */}
+          <li
+            role="option"
+            aria-selected={value === ''}
+            className="px-3 py-1.5 cursor-pointer text-gray-500 hover:bg-blue-50"
+            onMouseDown={() => selectItem('')}
+          >
+            — ยังไม่ map —
+          </li>
+          {filtered.length === 0 ? (
+            <li className="px-3 py-1.5 text-gray-400 italic">ไม่พบรายการ</li>
+          ) : (
+            filtered.map(o => (
+              <li
+                key={o.code}
+                role="option"
+                aria-selected={o.code === value}
+                className={`px-3 py-1.5 cursor-pointer hover:bg-blue-50 ${
+                  o.code === value ? 'bg-blue-100 font-medium' : ''
+                }`}
+                onMouseDown={() => selectItem(o.code)}
+              >
+                {o.code} — {o.name}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// ─── DataTable ────────────────────────────────────────────────────────────────
 function DataTable({ menu }: { menu: { key: string; label: string; pending: boolean } }) {
   const qc = useQueryClient()
   const { data: rows = [], isLoading, isError } = useQuery({
@@ -12,7 +156,7 @@ function DataTable({ menu }: { menu: { key: string; label: string; pending: bool
   })
   const { data: opts = [] } = useQuery({
     queryKey: ['basic-config-opts', menu.key],
-    queryFn: () => axios.get<{ code: string; name: string }[]>(`/api/basic-config/${menu.key}/std-options`).then(r => r.data),
+    queryFn: () => axios.get<StdOption[]>(`/api/basic-config/${menu.key}/std-options`).then(r => r.data),
     staleTime: 300_000,
   })
   const save = useMutation({
@@ -21,10 +165,40 @@ function DataTable({ menu }: { menu: { key: string; label: string; pending: bool
     onSuccess: () => qc.invalidateQueries({ queryKey: ['basic-config', menu.key] }),
   })
 
+  // ── Filter toggle state ──
+  const [showUnmappedOnly, setShowUnmappedOnly] = useState(false)
+
+  // ── Auto-match state ──
+  const [matching, setMatching] = useState(false)
+  const [autoMatchMsg, setAutoMatchMsg] = useState<string | null>(null)
+
   if (isLoading) return <div className="p-12 text-center text-gray-400">กำลังโหลด...</div>
   if (isError) return <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
 
+  // Summary always over full rows (not filtered)
   const s = summarize(rows)
+
+  // Displayed rows respect the filter toggle
+  const displayedRows = showUnmappedOnly ? rows.filter(isUnmapped) : rows
+
+  async function handleAutoMatch() {
+    setAutoMatchMsg(null)
+    const suggestions = autoMatchSuggestions(rows, opts)
+    if (suggestions.length === 0) {
+      setAutoMatchMsg('ไม่พบรายการที่จับคู่อัตโนมัติได้')
+      return
+    }
+    setMatching(true)
+    try {
+      for (const m of suggestions) {
+        await save.mutateAsync(m)
+      }
+      setAutoMatchMsg(`จับคู่อัตโนมัติ ${suggestions.length} รายการ`)
+    } finally {
+      setMatching(false)
+    }
+  }
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="px-4 py-2.5 bg-gray-50 border-b flex items-center justify-between">
@@ -41,6 +215,34 @@ function DataTable({ menu }: { menu: { key: string; label: string; pending: bool
           หมวดนี้ยังไม่พร้อมแก้ไข (รอยืนยันการจับคู่รหัส)
         </div>
       )}
+
+      {/* Controls bar — only for non-pending */}
+      {!menu.pending && (
+        <div className="px-4 py-2 border-b flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showUnmappedOnly}
+              onChange={e => setShowUnmappedOnly(e.target.checked)}
+              className="accent-blue-600"
+            />
+            แสดงเฉพาะที่ยังไม่ map
+          </label>
+
+          <button
+            onClick={handleAutoMatch}
+            disabled={matching}
+            className="px-3 py-1 text-sm rounded border border-blue-600 text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {matching ? 'กำลังจับคู่...' : 'จับคู่อัตโนมัติ'}
+          </button>
+
+          {autoMatchMsg && (
+            <span className="text-sm text-gray-600">{autoMatchMsg}</span>
+          )}
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-blue-700 text-white">
@@ -51,9 +253,9 @@ function DataTable({ menu }: { menu: { key: string; label: string; pending: bool
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {rows.length === 0 ? (
+            {displayedRows.length === 0 ? (
               <tr><td colSpan={3} className="px-4 py-8 text-center text-gray-400">ไม่พบข้อมูล</td></tr>
-            ) : rows.map(row => (
+            ) : displayedRows.map(row => (
               <tr key={row.code} className={isUnmapped(row) ? 'bg-red-50' : 'bg-white'}>
                 <td className="px-3 py-2 text-gray-700">{row.code}</td>
                 <td className="px-3 py-2 text-gray-700">
@@ -64,16 +266,11 @@ function DataTable({ menu }: { menu: { key: string; label: string; pending: bool
                   {menu.pending ? (
                     <span className="text-gray-500">{row.std_code ?? '—'}</span>
                   ) : (
-                    <select
-                      defaultValue={row.std_code ?? ''}
-                      onChange={e => save.mutate({ code: row.code, std_code: e.target.value })}
-                      className="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-md"
-                    >
-                      <option value="">— ยังไม่ map —</option>
-                      {opts.map(o => (
-                        <option key={o.code} value={o.code}>{o.code} — {o.name}</option>
-                      ))}
-                    </select>
+                    <StdCombobox
+                      value={row.std_code ?? ''}
+                      options={opts}
+                      onChange={(std_code) => save.mutate({ code: row.code, std_code })}
+                    />
                   )}
                 </td>
               </tr>
