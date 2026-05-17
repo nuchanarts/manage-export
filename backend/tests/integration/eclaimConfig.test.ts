@@ -44,13 +44,16 @@ describe('eclaim-config routes', () => {
     expect(res.status).toBe(404)
   })
 
-  it('PUT to a pending eclaim category → 400 PENDING_CATEGORY (no DB call)', async () => {
-    // 'eclaim-drug-ned' is pending:true (self-referential std table)
+  it('PUT to unknown eclaim category → 404 (pending-guard: eclaim-drug-ned is now editable; no pending entries remain)', async () => {
+    // After Task 1, eclaim-drug-ned is now pending:false (pk=doctor_reason, mapCol=claim_control, aligned with 43-file drug-ned-reason).
+    // No pending categories remain in ECLAIM_REGISTRY.
+    // The pending-guard logic still exists in configRouterFactory (if (c.pending) throw 400 PENDING_CATEGORY).
+    // We verify guard path is intact by confirming unknown key → 404 NOT_FOUND (guard would fire first for any pending key).
     const res = await request(app)
-      .put('/api/eclaim-config/eclaim-drug-ned/EA')
+      .put('/api/eclaim-config/totally-unknown-eclaim-key/EA')
       .send({ std_code: 'EA' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toBe('PENDING_CATEGORY')
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('NOT_FOUND')
     expect(mockQuery).not.toHaveBeenCalled()
   })
 

@@ -68,6 +68,31 @@ export function filterRows(rows: BasicRow[], query: string): BasicRow[] {
     normalizeName(r.std_name2 ?? '').includes(q))
 }
 
+/**
+ * Resolves what value to commit when the user submits a combobox query.
+ *
+ * Priority:
+ *   1. If query exactly matches an option's code → return that option's code.
+ *   2. If query exactly matches an option's name (normalised) → return that option's code.
+ *   3. If query is non-empty (trimmed) → return the raw trimmed query (free-text/custom code).
+ *   4. Empty query → return '' (clear mapping / "ยังไม่ map").
+ *
+ * This is a pure helper so it can be TDD-tested independently of the component.
+ */
+export function resolveComboCommit(query: string, options: StdOption[]): string {
+  const trimmed = query.trim()
+  if (!trimmed) return ''
+  // Exact code match (case-insensitive)
+  const byCode = options.find(o => o.code.toLowerCase() === trimmed.toLowerCase())
+  if (byCode) return byCode.code
+  // Exact name match (normalised)
+  const normQ = normalizeName(trimmed)
+  const byName = options.find(o => normalizeName(o.name) === normQ)
+  if (byName) return byName.code
+  // No match → commit the raw typed string
+  return trimmed
+}
+
 export type SortKey = 'code' | 'name' | 'std_code' | 'std_code2'
 export type SortDir = 'asc' | 'desc'
 

@@ -59,13 +59,13 @@ export const ECLAIM_REGISTRY: CategoryDef[] = [
     field1Label: 'ประเภทโรค', field2Label: 'ประเภทกิจกรรม',
     pending: false },
 
-  // aligned with 43-file 'drug-ned-reason'
-  // drugitems_ned_reason_list: claim_control IS pk; only 4 cols; no external std table
-  // [verified 2026-05-17; self-referential; same conclusion as basic-config 'drug-ned-reason']
+  // aligned with 43-file drug-ned-reason
+  // drugitems_ned_reason_list(doctor_reason PK, claim_control mapCol) — WHERE on doctor_reason; writable is claim_control (NED code)
+  // [verified 2026-05-17; self-referential std table intentional; pk=doctor_reason so no PK overwrite]
   { key: 'eclaim-drug-ned', label: 'เหตุผลการสั่งยา NED',
-    table: 'drugitems_ned_reason_list', pk: 'claim_control', nameCol: 'doctor_reason', mapCol: 'claim_control',
+    table: 'drugitems_ned_reason_list', pk: 'doctor_reason', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
-    pending: true },
+    pending: false },
 ]
 
 export function getEclaimCategory(key: string): CategoryDef | undefined {

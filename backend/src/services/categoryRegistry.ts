@@ -155,11 +155,13 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     table: 'drugitems', pk: 'icode', nameCol: 'name', mapCol: 'did',
     stdTable: 'drugitems_register', stdCodeCol: 'std_code', stdNameCol: 'drugname',
     pending: false },
-  // drugitems_ned_reason_list: no external std table; claim_control IS pk; only 4 cols (doctor_reason, claim_control, hos_guid, hos_guid_ext) [verified 2026-05-17; self-referential]
+  // drugitems_ned_reason_list(doctor_reason PK, claim_control mapCol) — 4 cols only: doctor_reason, claim_control, hos_guid, hos_guid_ext
+  // WHERE is on doctor_reason (row identity); writable column is claim_control (distinct NED code) — safe to edit, no PK overwrite
+  // [verified 2026-05-17; self-referential std table for code lookup is intentional]
   { key: 'drug-ned-reason', label: 'เหตุผลการสั่งยา',
-    table: 'drugitems_ned_reason_list', pk: 'claim_control', nameCol: 'doctor_reason', mapCol: 'claim_control',
+    table: 'drugitems_ned_reason_list', pk: 'doctor_reason', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
-    pending: true },
+    pending: false },
   // diagtype(diagtype PK, name, nhso_code) -> provis_diagtype(code, name): nhso_code col distinct from pk; schema valid; NULL in demo but operator populates [verified 2026-05-17]
   { key: 'diagnosis-type', label: 'ประเภทการวินิจฉัย',
     table: 'diagtype', pk: 'diagtype', nameCol: 'name', mapCol: 'nhso_code',

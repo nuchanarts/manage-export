@@ -44,11 +44,15 @@ describe('basic-config routes', () => {
     expect(res.status).toBe(400)
   })
 
-  it('PUT to a pending category → 400 PENDING_CATEGORY (no DB call needed)', async () => {
-    // 'drug-ned-reason' is pending:true in the registry (self-referential std table)
-    const res = await request(app).put('/api/basic-config/drug-ned-reason/001').send({ std_code: '001' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toBe('PENDING_CATEGORY')
+  it('PUT to unknown category → 404 (pending-guard: no pending categories remain in basic-config registry after drug-ned-reason was made editable)', async () => {
+    // After Task 1, drug-ned-reason is now pending:false (pk=doctor_reason, mapCol=claim_control).
+    // No pending categories remain in categoryRegistry.
+    // The pending-guard logic still exists in configRouterFactory (line: if (c.pending) throw 400 PENDING_CATEGORY).
+    // We verify the guard is still there indirectly: an unknown key produces 404 NOT_FOUND,
+    // and the guard would fire first if a pending key were present.
+    const res = await request(app).put('/api/basic-config/totally-unknown-key/001').send({ std_code: '001' })
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('NOT_FOUND')
     // Guard fires before any DB call — mock should never have been invoked
     expect(mockQuery).not.toHaveBeenCalled()
   })

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import {
@@ -8,6 +8,7 @@ import {
   filterRows,
   autoMatchSuggestions,
   sortRows,
+  resolveComboCommit,
   BasicRow,
   StdOption,
   SortKey,
@@ -73,6 +74,15 @@ function StdCombobox({
 
   function handleBlur() {
     blurTimerRef.current = setTimeout(() => {
+      // On blur: if the user typed something that doesn't match any option exactly,
+      // commit the raw typed value (free-text/custom code entry).
+      if (open && query.trim() !== '') {
+        const commit = resolveComboCommit(query, options)
+        // Only fire onChange if the value is actually different from current
+        if (commit !== value) {
+          onChange(commit)
+        }
+      }
       closeDropdown()
     }, 150)
   }
@@ -87,10 +97,17 @@ function StdCombobox({
       closeDropdown()
       inputRef.current?.blur()
     } else if (e.key === 'Enter') {
+      e.preventDefault()
       if (filtered.length > 0) {
+        // There are matching options — select the first (existing behaviour)
         selectItem(filtered[0]!.code)
-        inputRef.current?.blur()
+      } else {
+        // No matching option: commit the raw typed query (free-text / custom code)
+        const commit = resolveComboCommit(query, options)
+        if (commit !== value) onChange(commit)
+        closeDropdown()
       }
+      inputRef.current?.blur()
     } else if (!open) {
       openDropdown()
     }
@@ -138,7 +155,18 @@ function StdCombobox({
             — ยังไม่ map —
           </li>
           {filtered.length === 0 ? (
-            <li className="px-3 py-1.5 text-gray-400 italic">ไม่พบรายการ</li>
+            <li
+              role="option"
+              aria-selected={false}
+              className="px-3 py-1.5 cursor-pointer text-blue-600 hover:bg-blue-50 italic"
+              onMouseDown={() => {
+                const commit = resolveComboCommit(query, options)
+                if (commit !== value) onChange(commit)
+                closeDropdown()
+              }}
+            >
+              {query.trim() ? `ใช้รหัส "${query.trim()}"` : 'ไม่พบรายการ'}
+            </li>
           ) : (
             filtered.map(o => (
               <li
@@ -218,6 +246,43 @@ function DataTable({
     if (sort === null || sort.key !== key) return ' ⇅'
     return sort.dir === 'asc' ? ' ▲' : ' ▼'
   }
+
+  // ── Column resize state ──
+  // Default widths (px); persisted to localStorage keyed by apiBase for convenience.
+  const STORAGE_KEY = `col-widths:${apiBase}`
+  const defaultWidths = { code: 80, name: 224, std_code: 240, std_code2: 240 }
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) return { ...defaultWidths, ...JSON.parse(stored) }
+    } catch { /* ignore */ }
+    return { ...defaultWidths }
+  })
+
+  const startColResize = useCallback((colKey: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()          // don't trigger sort
+    const startX = e.clientX
+    const startW = colWidths[colKey] ?? defaultWidths[colKey as keyof typeof defaultWidths] ?? 120
+    const onMove = (ev: MouseEvent) => {
+      const newW = Math.max(60, startW + (ev.clientX - startX))
+      setColWidths(prev => {
+        const next = { ...prev, [colKey]: newW }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+        return next
+      })
+    }
+    const onUp = () => {
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [colWidths, STORAGE_KEY])
 
   // ── Auto-match state ──
   const [matching, setMatching] = useState(false)
@@ -308,35 +373,58 @@ function DataTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
+        <table className="min-w-full text-sm table-fixed">
+          <colgroup>
+            <col style={{ width: colWidths.code }} />
+            <col style={{ width: colWidths.name }} />
+            <col style={{ width: colWidths.std_code }} />
+            {isDual && <col style={{ width: colWidths.std_code2 }} />}
+          </colgroup>
           <thead className="bg-blue-700 text-white">
             <tr>
+              {/* Each <th> has a right-edge drag handle; the handle stops propagation so sort still works on th click */}
               <th
-                className="text-left px-3 py-2 font-medium w-20 cursor-pointer select-none"
+                className="text-left px-3 py-2 font-medium cursor-pointer select-none relative"
                 onClick={() => handleSortClick('code')}
               >
                 รหัส<span className="text-xs opacity-70">{sortIndicator('code')}</span>
+                <span
+                  className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-white/30"
+                  onMouseDown={e => startColResize('code', e)}
+                />
               </th>
               <th
-                className="text-left px-3 py-2 font-medium w-56 cursor-pointer select-none"
+                className="text-left px-3 py-2 font-medium cursor-pointer select-none relative"
                 onClick={() => handleSortClick('name')}
               >
                 ชื่อ (HIS)<span className="text-xs opacity-70">{sortIndicator('name')}</span>
+                <span
+                  className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-white/30"
+                  onMouseDown={e => startColResize('name', e)}
+                />
               </th>
               <th
-                className="text-left px-3 py-2 font-medium cursor-pointer select-none"
+                className="text-left px-3 py-2 font-medium cursor-pointer select-none relative"
                 onClick={() => handleSortClick('std_code')}
               >
                 {isDual ? (menu.field1Label ?? 'รหัสมาตรฐาน 1') : 'รหัสมาตรฐาน'}
                 <span className="text-xs opacity-70">{sortIndicator('std_code')}</span>
+                <span
+                  className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-white/30"
+                  onMouseDown={e => startColResize('std_code', e)}
+                />
               </th>
               {isDual && (
                 <th
-                  className="text-left px-3 py-2 font-medium cursor-pointer select-none"
+                  className="text-left px-3 py-2 font-medium cursor-pointer select-none relative"
                   onClick={() => handleSortClick('std_code2')}
                 >
                   {menu.field2Label ?? 'รหัสมาตรฐาน 2'}
                   <span className="text-xs opacity-70">{sortIndicator('std_code2')}</span>
+                  <span
+                    className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-white/30"
+                    onMouseDown={e => startColResize('std_code2', e)}
+                  />
                 </th>
               )}
             </tr>

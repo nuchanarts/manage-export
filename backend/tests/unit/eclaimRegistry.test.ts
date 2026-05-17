@@ -89,15 +89,19 @@ describe('eclaimRegistry — integrity', () => {
     expect(new Set(keys).size).toBe(keys.length)
   })
 
-  it('pending entries have mapCol === pk (self-referential guard)', () => {
+  it('pending entries have mapCol === pk (self-referential guard) — vacuously true after Task 1 made eclaim-drug-ned editable', () => {
+    // After Task 1: eclaim-drug-ned moved to pending:false (pk=doctor_reason, mapCol=claim_control).
+    // No pending entries remain in ECLAIM_REGISTRY; the loop is vacuously true.
+    // The invariant is documented: if any new pending entry is added it must have mapCol === pk.
     const pendingEntries = ECLAIM_REGISTRY.filter(c => c.pending)
     for (const c of pendingEntries) {
-      // All pending eclaim entries are self-referential (mapCol === pk)
       expect(c.mapCol).toBe(c.pk)
     }
   })
 
   it('non-pending entries have mapCol !== pk (safe to update)', () => {
+    // All entries are now non-pending; each must have mapCol distinct from pk.
+    // eclaim-drug-ned: pk=doctor_reason, mapCol=claim_control (distinct) — safe to update.
     const confirmed = ECLAIM_REGISTRY.filter(c => !c.pending)
     for (const c of confirmed) {
       expect(c.mapCol).not.toBe(c.pk)
