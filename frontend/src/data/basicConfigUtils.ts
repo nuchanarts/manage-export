@@ -261,6 +261,62 @@ export function formatDryRunHeadline(result: DryRunResult): string {
   return `ยังมีรหัสที่ยังไม่ map ${result.totalUnmapped.toLocaleString()} รายการ`
 }
 
+// ── F10: snapshot helpers ─────────────────────────────────────────────────────
+
+/** One snapshot list item (no payload). */
+export interface SnapshotListItem {
+  id: number
+  ts: string
+  label: string
+  actor: string
+}
+
+/** One diff entry from /_snapshots/:id/diff. */
+export interface SnapshotDiffEntry {
+  category: string
+  code: string
+  field: string
+  from: string | null
+  to: string | null
+}
+
+/** Full diff result from /_snapshots/:id/diff. */
+export interface SnapshotDiffResult {
+  changed: SnapshotDiffEntry[]
+  totalChanged: number
+}
+
+/** Restore result from POST /_snapshots/:id/restore. */
+export interface SnapshotRestoreResult {
+  restored: number
+  skippedPending: number
+  errors: { category: string; code: string; error: string }[]
+}
+
+/**
+ * Formats the restore result as a concise Thai summary string.
+ * e.g. "กู้คืนแล้ว 5 รายการ · ข้าม 0 · ผิดพลาด 0"
+ */
+export function formatRestoreResult(result: SnapshotRestoreResult): string {
+  return `กู้คืนแล้ว ${result.restored} รายการ · ข้าม ${result.skippedPending} · ผิดพลาด ${result.errors.length}`
+}
+
+/**
+ * Formats a snapshot timestamp (ISO or MySQL datetime) for display.
+ * Returns a locale-formatted string.
+ */
+export function formatSnapshotTs(ts: string): string {
+  try {
+    // MySQL datetime: '2026-05-17 10:00:00' — convert space to T for parseability
+    const normalized = ts.replace(' ', 'T')
+    const d = new Date(normalized)
+    if (isNaN(d.getTime())) return ts
+    return d.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
+  } catch {
+    return ts
+  }
+}
+
 export type SortKey = 'code' | 'name' | 'std_code' | 'std_code2'
 export type SortDir = 'asc' | 'desc'
 

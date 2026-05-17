@@ -24,6 +24,14 @@ import { summarizeCounts } from '../../services/dashboard'
 import type { SummaryRow } from '../../services/dashboard'
 import { buildDryRunResult } from '../../services/dryrun'
 import type { DryRunCategoryInput } from '../../services/dryrun'
+import {
+  captureSnapshot,
+  saveSnapshot,
+  listSnapshots,
+  getSnapshot,
+  diffSnapshotVsCurrent,
+  planRestore,
+} from '../../services/snapshotService'
 
 // Backward-compatible body schema: at least one of std_code, std_code2, or extra must be present
 // max(50) accommodates 24-char TMT drug codes and other longer standard codes.
@@ -358,6 +366,170 @@ export function makeConfigRouter(
 
       const result = buildDryRunResult(catInputs, sampleLimit, reg)
       res.json(result)
+    } catch (err) { next(err) }
+  })
+
+  // ── F10: Snapshot label validation schema ─────────────────────────────────
+  const snapshotLabelSchema = z.object({
+    label: z.string().min(1).max(120),
+  })
+
+  // ── POST /_snapshots — capture + save a named snapshot ───────────────────
+  // Registered BEFORE /:category to avoid path collision.
+  router.post('/_snapshots', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = snapshotLabelSchema.safeParse(req.body)
+      if (!parsed.success) throw new AppError(400, 'INVALID_BODY', 'label ต้องไม่ว่างและไม่เกิน 120 ตัวอักษร')
+
+      const actor = req.header('x-actor') || 'snapshot'
+      const reg = registryName ?? 'basic'
+
+      const payload = await captureSnapshot(reg, list, get)
+      const id = await saveSnapshot(reg, parsed.data.label, actor, payload)
+
+      res.json({ id })
+    } catch (err) { next(err) }
+  })
+
+  // ── GET /_snapshots — list snapshots (no payload) ─────────────────────────
+  // Registered BEFORE /:category to avoid path collision.
+  router.get('/_snapshots', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const reg = registryName ?? 'basic'
+      const rows = await listSnapshots(reg)
+      res.json(rows)
+    } catch (err) { next(err) }
+  })
+
+  // ── GET /_snapshots/:id/diff — diff snapshot vs current ──────────────────
+  // Registered BEFORE /:category to avoid path collision.
+  router.get('/_snapshots/:id/diff', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const reg = registryName ?? 'basic'
+      const id = parseInt(String(req.params.id), 10)
+      if (isNaN(id)) throw new AppError(404, 'NOT_FOUND', 'ไม่พบสแน็ปช็อต')
+
+      const snap = await getSnapshot(reg, id)
+      if (!snap) throw new AppError(404, 'NOT_FOUND', `ไม่พบสแน็ปช็อต id=${id}`)
+
+      const currentPayload = await captureSnapshot(reg, list, get)
+      const diff = diffSnapshotVsCurrent(snap.payload, currentPayload)
+
+      res.json(diff)
+    } catch (err) { next(err) }
+  })
+
+  // ── POST /_snapshots/:id/restore — restore a snapshot ────────────────────
+  // Registered BEFORE /:category to avoid path collision.
+  // Pending-guarded + parameterized + audited (same safety as F5).
+  router.post('/_snapshots/:id/restore', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const reg = registryName ?? 'basic'
+      const id = parseInt(String(req.params.id), 10)
+      if (isNaN(id)) throw new AppError(404, 'NOT_FOUND', 'ไม่พบสแน็ปช็อต')
+
+      const snap = await getSnapshot(reg, id)
+      if (!snap) throw new AppError(404, 'NOT_FOUND', `ไม่พบสแน็ปช็อต id=${id}`)
+
+      const actor = 'restore'
+
+      // Capture current state to compute diff
+      const currentPayload = await captureSnapshot(reg, list, get)
+
+      // Plan which writes are needed
+      const writes = planRestore(snap.payload, currentPayload)
+
+      let restored = 0
+      let skippedPending = 0
+      const errors: { category: string; code: string; error: string }[] = []
+
+      for (const w of writes) {
+        try {
+          const c = get(w.category)
+          if (!c) continue  // unknown category key in snapshot → skip silently
+
+          // Pending guard: never write to pending categories
+          if (c.pending) {
+            skippedPending++
+            continue
+          }
+
+          // Determine which field and builder to use
+          const value = w.value ?? ''
+
+          if (w.field === 'std_code') {
+            const { sql, params } = buildUpdateSql(c, w.code, value)
+            await query(sql, params)
+            restored++
+            // Best-effort audit
+            try {
+              await recordMappingChange({
+                registry: reg,
+                category: w.category,
+                code: w.code,
+                field: 'std_code',
+                oldValue: currentPayload[w.category]
+                  ? ((currentPayload[w.category] as Record<string, { s: string | null }>)[w.code]?.s ?? null)
+                  : null,
+                newValue: value === '' ? null : value,
+                actor,
+              })
+            } catch { /* best-effort */ }
+
+          } else if (w.field === 'std_code2') {
+            if (!c.mapCol2) { skippedPending++; continue }
+            const { sql, params } = buildUpdateSql2(c, w.code, value)
+            await query(sql, params)
+            restored++
+            try {
+              await recordMappingChange({
+                registry: reg,
+                category: w.category,
+                code: w.code,
+                field: 'std_code2',
+                oldValue: currentPayload[w.category]
+                  ? ((currentPayload[w.category] as Record<string, { s2?: string | null }>)[w.code]?.s2 ?? null)
+                  : null,
+                newValue: value === '' ? null : value,
+                actor,
+              })
+            } catch { /* best-effort */ }
+
+          } else {
+            // Extra field: std_code_e{N}
+            const extraMatch = /^std_code_e(\d+)$/.exec(w.field)
+            if (!extraMatch) continue
+            const idx = parseInt(extraMatch[1]!, 10)
+            if (!c.extraFields || idx < 0 || idx >= c.extraFields.length) continue
+            const { sql, params } = buildUpdateSqlExtra(c, idx, w.code, value)
+            await query(sql, params)
+            restored++
+            try {
+              await recordMappingChange({
+                registry: reg,
+                category: w.category,
+                code: w.code,
+                field: w.field,
+                oldValue: currentPayload[w.category]
+                  ? ((currentPayload[w.category] as Record<string, { e?: Record<number, string | null> }>)[w.code]?.e?.[idx] ?? null)
+                  : null,
+                newValue: value === '' ? null : value,
+                actor,
+              })
+            } catch { /* best-effort */ }
+          }
+
+        } catch (writeErr) {
+          // Per-write resilience: collect error and continue
+          errors.push({
+            category: w.category,
+            code: w.code,
+            error: writeErr instanceof Error ? writeErr.message : String(writeErr),
+          })
+        }
+      }
+
+      res.json({ restored, skippedPending, errors })
     } catch (err) { next(err) }
   })
 
