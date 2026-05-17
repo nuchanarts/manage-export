@@ -10,6 +10,7 @@ import { KnowledgePage } from './pages/KnowledgePage'
 import { GlobalSearchPage } from './pages/GlobalSearchPage'
 import { THEMES, getStoredTheme, storeTheme } from './theme/theme'
 import { getOrCreateClientId } from './utils/clientId'
+import { onNavigate } from './data/appNav'
 
 type MenuKey = 'dashboard' | 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge' | 'global-search'
 
@@ -183,6 +184,19 @@ export function App() {
   const [theme, setTheme] = useState<string>(() => getStoredTheme(window.localStorage))
   const [online, setOnline] = useState<number>(1)
 
+  // F8: pending deep-link category key — passed to BasicConfigPage / EClaimConfigPage
+  // so ConfigCatalog can pre-select the right category.
+  const [pendingCategory, setPendingCategory] = useState<string | null>(null)
+
+  // Subscribe to navigation requests from ValidatePage deep-link buttons.
+  useEffect(() => {
+    const unsub = onNavigate(r => {
+      setActiveMenu(r.menu as MenuKey)
+      setPendingCategory(r.categoryKey ?? null)
+    })
+    return unsub
+  }, [])
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
@@ -308,8 +322,8 @@ export function App() {
           {activeMenu === 'dashboard' && <DashboardPage />}
           {activeMenu === 'validate' && <ValidatePage />}
           {activeMenu === 'nhso-links' && <NhsoLinksPage />}
-          {activeMenu === 'basic-config' && <BasicConfigPage />}
-          {activeMenu === 'eclaim-config' && <EClaimConfigPage />}
+          {activeMenu === 'basic-config' && <BasicConfigPage initialCategoryKey={pendingCategory ?? undefined} />}
+          {activeMenu === 'eclaim-config' && <EClaimConfigPage initialCategoryKey={pendingCategory ?? undefined} />}
           {activeMenu === 'drug-catalog' && <DrugCatalogPage />}
           {activeMenu === 'help' && <HelpPage />}
           {activeMenu === 'knowledge' && <KnowledgePage />}

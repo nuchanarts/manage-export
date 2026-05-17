@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import axios from 'axios'
 import { LoadingSpinner } from '../components/shared/LoadingSpinner'
+import { requestNavigate } from '../data/appNav'
+import { mapValidationToCategory } from '../data/validationLink'
 
 interface FieldError {
   row: number
@@ -593,13 +595,36 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
             <div className="mt-3 space-y-3">
               {Object.keys(byField).length === 0
                 ? <p className="text-green-700 text-center py-6">✅ ไม่พบปัญหาข้อมูล</p>
-                : Object.entries(byField).map(([fieldName, errors]) => (
+                : Object.entries(byField).map(([fieldName, errors]) => {
+                  const fieldNavTarget = mapValidationToCategory({ field: fieldName, fileName: file.fileName })
+                  return (
                   <div key={fieldName} className="border border-gray-200 rounded-lg overflow-hidden">
                     <div className="bg-gray-50 px-3 py-2">
                       <div className="flex items-center justify-between flex-wrap gap-1">
-                        <div>
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono font-bold text-sm text-gray-900">{fieldName}</span>
-                          <span className="ml-2 text-sm text-blue-700 font-medium">({errors[0]!.caption})</span>
+                          <span className="text-sm text-blue-700 font-medium">({errors[0]!.caption})</span>
+                          {fieldNavTarget && (
+                            fieldNavTarget.menu === 'global-search'
+                              ? (
+                                <button
+                                  onClick={() => requestNavigate({ menu: 'global-search' })}
+                                  className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                                  title="ค้นหารหัสนี้ข้ามหมวด"
+                                >
+                                  🔎 ค้นหารหัสนี้
+                                </button>
+                              )
+                              : (
+                                <button
+                                  onClick={() => requestNavigate(fieldNavTarget)}
+                                  className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                                  title="ไปแก้ไขการจับคู่รหัสนี้"
+                                >
+                                  🔧 ไปแก้ที่ตั้งค่าข้อมูลพื้นฐาน
+                                </button>
+                              )
+                          )}
                         </div>
                         <span className="text-xs text-red-600 font-semibold">{errors.length.toLocaleString()} รายการ</span>
                       </div>
@@ -643,8 +668,8 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
                     </table>
                     {errors.length > 50 && <p className="text-xs text-gray-400 px-3 py-1.5">...และอีก {errors.length - 50} รายการ</p>}
                   </div>
-                ))
-              }
+                  )
+                })}
             </div>
           )}
         </div>
@@ -926,13 +951,37 @@ export function ValidatePage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {g.topErrors.map(e => (
-                        <div key={e.field} className="flex items-center gap-1.5 bg-red-50 border border-red-100 rounded-lg px-2 py-1">
-                          <span className="font-mono text-xs font-semibold text-red-800">{e.field}</span>
-                          <span className="text-xs text-gray-500">{e.caption}</span>
-                          <span className="bg-red-200 text-red-800 text-[11px] px-1.5 py-0.5 rounded-full font-semibold">{e.count.toLocaleString()}</span>
-                        </div>
-                      ))}
+                      {g.topErrors.map(e => {
+                        const navTarget = mapValidationToCategory({ field: e.field, fileName: g.fileName })
+                        return (
+                          <div key={e.field} className="flex items-center gap-1.5 bg-red-50 border border-red-100 rounded-lg px-2 py-1">
+                            <span className="font-mono text-xs font-semibold text-red-800">{e.field}</span>
+                            <span className="text-xs text-gray-500">{e.caption}</span>
+                            <span className="bg-red-200 text-red-800 text-[11px] px-1.5 py-0.5 rounded-full font-semibold">{e.count.toLocaleString()}</span>
+                            {navTarget && (
+                              navTarget.menu === 'global-search'
+                                ? (
+                                  <button
+                                    onClick={() => requestNavigate({ menu: 'global-search' })}
+                                    className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors shrink-0"
+                                    title="ค้นหารหัสนี้ข้ามหมวด"
+                                  >
+                                    🔎 ค้นหารหัสนี้
+                                  </button>
+                                )
+                                : (
+                                  <button
+                                    onClick={() => requestNavigate(navTarget)}
+                                    className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors shrink-0"
+                                    title="ไปแก้ไขการจับคู่รหัสนี้"
+                                  >
+                                    🔧 ไปแก้ที่ตั้งค่าข้อมูลพื้นฐาน
+                                  </button>
+                                )
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 ))}

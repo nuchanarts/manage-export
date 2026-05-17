@@ -783,9 +783,11 @@ export interface ConfigCatalogProps {
   apiBase: string      // e.g. '/api/basic-config' or '/api/eclaim-config'
   sidebarTitle: string // Thai label shown in the sidebar header
   relatedLinks?: { label: string; url: string }[] // optional external links shown in the sidebar header
+  /** Optional: pre-select a category by key (e.g. from a deep-link nav request). When provided and the key exists in fetched menus, that category is activated. Existing default-first-menu behaviour is unchanged when this prop is absent. */
+  initialCategoryKey?: string
 }
 
-export function ConfigCatalog({ apiBase, sidebarTitle, relatedLinks }: ConfigCatalogProps) {
+export function ConfigCatalog({ apiBase, sidebarTitle, relatedLinks, initialCategoryKey }: ConfigCatalogProps) {
   const { data: menus = [] } = useQuery({
     queryKey: [`${apiBase}-menus`],
     queryFn: () =>
@@ -794,6 +796,22 @@ export function ConfigCatalog({ apiBase, sidebarTitle, relatedLinks }: ConfigCat
   })
 
   const [activeKey, setActiveKey] = useState<string | null>(null)
+
+  // When initialCategoryKey changes (e.g. a new deep-link request arrives) and
+  // menus are loaded, switch to that category if it exists. This also handles
+  // the case where menus load after the prop is first set.
+  const prevInitialRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!initialCategoryKey) return
+    if (initialCategoryKey === prevInitialRef.current) return
+    if (menus.length === 0) return
+    const exists = menus.some(m => m.key === initialCategoryKey)
+    if (exists) {
+      setActiveKey(initialCategoryKey)
+      prevInitialRef.current = initialCategoryKey
+    }
+  }, [initialCategoryKey, menus])
+
   const resolvedKey = activeKey ?? menus[0]?.key ?? null
   const activeMenu = menus.find(m => m.key === resolvedKey) ?? null
 

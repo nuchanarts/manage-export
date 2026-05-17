@@ -1,6 +1,11 @@
 import { ConfigCatalog } from '../components/shared/ConfigCatalog'
 
-export function EClaimConfigPage() {
+interface EClaimConfigPageProps {
+  /** Optional category key to pre-select (passed from App via deep-link nav). */
+  initialCategoryKey?: string
+}
+
+export function EClaimConfigPage({ initialCategoryKey }: EClaimConfigPageProps = {}) {
   return (
     <ConfigCatalog
       apiBase="/api/eclaim-config"
@@ -8,6 +13,7 @@ export function EClaimConfigPage() {
       relatedLinks={[
         { label: 'หน่วยบริการ FDH (สธ.)', url: 'https://fdh.moph.go.th/hospital/' },
       ]}
+      initialCategoryKey={initialCategoryKey}
     />
   )
 }
