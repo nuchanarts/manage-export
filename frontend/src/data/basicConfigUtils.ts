@@ -223,6 +223,44 @@ export function summaryToUnmappedMap(
   return result
 }
 
+// ── F12: dry-run helpers ──────────────────────────────────────────────────────
+
+/** One failing sample entry from /_dryrun. */
+export interface DryRunSample {
+  code: string
+  name: string
+}
+
+/** Per-category entry in /_dryrun results. */
+export interface DryRunCategoryResult {
+  key: string
+  label: string
+  pending?: boolean
+  error?: boolean
+  unmappedCount?: number
+  samples?: DryRunSample[]
+}
+
+/** Full /_dryrun response shape. */
+export interface DryRunResult {
+  registry: string
+  status: 'PASS' | 'FAIL'
+  totalCategories: number
+  categoriesWithIssues: number
+  totalUnmapped: number
+  results: DryRunCategoryResult[]
+}
+
+/**
+ * Formats the dry-run status headline.
+ * PASS → "พร้อมส่งออก ✅"
+ * FAIL → "ยังมีรหัสที่ยังไม่ map N รายการ"
+ */
+export function formatDryRunHeadline(result: DryRunResult): string {
+  if (result.status === 'PASS') return 'พร้อมส่งออก ✅'
+  return `ยังมีรหัสที่ยังไม่ map ${result.totalUnmapped.toLocaleString()} รายการ`
+}
+
 export type SortKey = 'code' | 'name' | 'std_code' | 'std_code2'
 export type SortDir = 'asc' | 'desc'
 

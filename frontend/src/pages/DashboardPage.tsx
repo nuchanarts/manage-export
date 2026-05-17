@@ -9,6 +9,8 @@
  */
 
 import { useState, useEffect } from 'react'
+import type { DryRunResult, DryRunCategoryResult } from '../data/basicConfigUtils'
+import { formatDryRunHeadline } from '../data/basicConfigUtils'
 
 // ─── Types (mirrors backend /_summary response) ──────────────────────────────
 
@@ -60,6 +62,128 @@ function sortCategories(cats: CategorySummary[]): CategorySummary[] {
     if (bU !== aU) return bU - aU
     return a.label.localeCompare(b.label, 'th')
   })
+}
+
+// ─── Dry-run fetch helper ─────────────────────────────────────────────────────
+
+async function fetchDryRun(apiBase: string): Promise<DryRunResult> {
+  const res = await fetch(`${apiBase}/_dryrun`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { message?: string }
+    throw new Error(body.message ?? `HTTP ${res.status}`)
+  }
+  return res.json() as Promise<DryRunResult>
+}
+
+// ─── Dry-run UI sub-components ────────────────────────────────────────────────
+
+function DryRunCategoryRow({ cat }: { cat: DryRunCategoryResult }) {
+  const [open, setOpen] = useState(false)
+
+  if (cat.pending) {
+    return (
+      <div className="px-4 py-2 text-xs text-yellow-700 flex items-center gap-2">
+        <span className="font-medium">{cat.label}</span>
+        <span className="bg-yellow-100 border border-yellow-200 px-1.5 py-0.5 rounded-full text-[10px]">รอยืนยัน</span>
+      </div>
+    )
+  }
+
+  if (cat.error) {
+    return (
+      <div className="px-4 py-2 text-xs text-red-600 flex items-center gap-2">
+        <span className="font-medium">{cat.label}</span>
+        <span className="bg-red-100 border border-red-200 px-1.5 py-0.5 rounded-full text-[10px]">ข้อผิดพลาด</span>
+      </div>
+    )
+  }
+
+  if ((cat.unmappedCount ?? 0) === 0) {
+    return (
+      <div className="px-4 py-2 text-xs text-green-700 flex items-center gap-2">
+        <span className="text-green-500">✓</span>
+        <span className="font-medium">{cat.label}</span>
+        <span className="text-gray-400">ครบถ้วน</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="border-t border-red-100 first:border-t-0">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full px-4 py-2 text-xs text-left flex items-center justify-between hover:bg-red-50 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-red-500 font-bold">✗</span>
+          <span className="font-medium text-gray-800">{cat.label}</span>
+          <span className="bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-full text-[10px] font-medium">
+            ยังไม่ map {cat.unmappedCount!.toLocaleString()} รายการ
+          </span>
+        </span>
+        <span className="text-gray-400 text-[10px]">{open ? '▲ ซ่อน' : '▼ ดูตัวอย่าง'}</span>
+      </button>
+      {open && cat.samples && cat.samples.length > 0 && (
+        <div className="px-6 pb-3 bg-red-50">
+          <table className="text-[11px] w-full max-w-lg">
+            <thead>
+              <tr className="text-gray-500">
+                <th className="text-left pr-4 py-1 font-medium">รหัส</th>
+                <th className="text-left py-1 font-medium">ชื่อ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-red-100">
+              {cat.samples.map(s => (
+                <tr key={s.code}>
+                  <td className="pr-4 py-0.5 font-mono text-red-700">{s.code}</td>
+                  <td className="py-0.5 text-gray-700">{s.name}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(cat.unmappedCount ?? 0) > (cat.samples?.length ?? 0) && (
+            <p className="text-[10px] text-gray-400 mt-1">
+              แสดง {cat.samples.length} จาก {cat.unmappedCount!.toLocaleString()} รายการ
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DryRunRegistryPanel({
+  result,
+  registryLabel,
+}: {
+  result: DryRunResult
+  registryLabel: string
+}) {
+  const isPass = result.status === 'PASS'
+  const headline = formatDryRunHeadline(result)
+
+  return (
+    <div className={`rounded-lg border overflow-hidden ${isPass ? 'border-green-200' : 'border-red-200'}`}>
+      <div className={`px-4 py-3 flex items-center justify-between ${isPass ? 'bg-green-50' : 'bg-red-50'}`}>
+        <div>
+          <span className="font-semibold text-sm text-gray-800">{registryLabel}</span>
+          <span className={`ml-3 font-bold text-sm ${isPass ? 'text-green-700' : 'text-red-700'}`}>
+            {headline}
+          </span>
+        </div>
+        <span className="text-xs text-gray-500">
+          {result.totalCategories} หมวด
+          {!isPass && ` · มีปัญหา ${result.categoriesWithIssues} หมวด`}
+        </span>
+      </div>
+      <div className="bg-white divide-y divide-gray-100">
+        {result.results.map(cat => (
+          <DryRunCategoryRow key={cat.key} cat={cat} />
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -213,6 +337,42 @@ export function DashboardPage() {
   const [loading,  setLoading]  = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  // ── F12: Dry-run state ────────────────────────────────────────────────────
+  const [dryRunLoading,      setDryRunLoading]      = useState(false)
+  const [dryRunError,        setDryRunError]        = useState<string | null>(null)
+  const [dryRunBasic,        setDryRunBasic]        = useState<DryRunResult | null>(null)
+  const [dryRunEclaim,       setDryRunEclaim]       = useState<DryRunResult | null>(null)
+  const [dryRunPanelVisible, setDryRunPanelVisible] = useState(false)
+
+  async function handleDryRun() {
+    setDryRunLoading(true)
+    setDryRunError(null)
+    setDryRunBasic(null)
+    setDryRunEclaim(null)
+    setDryRunPanelVisible(true)
+
+    const [basicResult, eclaimResult] = await Promise.allSettled([
+      fetchDryRun('/api/basic-config'),
+      fetchDryRun('/api/eclaim-config'),
+    ])
+
+    if (basicResult.status === 'fulfilled') {
+      setDryRunBasic(basicResult.value)
+    } else {
+      const msg = basicResult.reason instanceof Error ? basicResult.reason.message : String(basicResult.reason)
+      setDryRunError(prev => prev ? `${prev} | 43แฟ้ม: ${msg}` : `43แฟ้ม: ${msg}`)
+    }
+
+    if (eclaimResult.status === 'fulfilled') {
+      setDryRunEclaim(eclaimResult.value)
+    } else {
+      const msg = eclaimResult.reason instanceof Error ? eclaimResult.reason.message : String(eclaimResult.reason)
+      setDryRunError(prev => prev ? `${prev} | E-Claim: ${msg}` : `E-Claim: ${msg}`)
+    }
+
+    setDryRunLoading(false)
+  }
+
   useEffect(() => {
     let cancelled = false
 
@@ -262,10 +422,82 @@ export function DashboardPage() {
   return (
     <div className="space-y-5 max-w-6xl mx-auto">
       {/* Page header */}
-      <div className="bg-white rounded-lg shadow p-5">
-        <h2 className="text-lg font-bold text-gray-800 mb-0.5">ภาพรวมความครบถ้วน</h2>
-        <p className="text-xs text-gray-500">ตรวจความครบถ้วนก่อนส่งออก 43 แฟ้ม</p>
+      <div className="bg-white rounded-lg shadow p-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-800 mb-0.5">ภาพรวมความครบถ้วน</h2>
+          <p className="text-xs text-gray-500">ตรวจความครบถ้วนก่อนส่งออก 43 แฟ้ม</p>
+        </div>
+        {/* F12: Dry-run button */}
+        <button
+          type="button"
+          onClick={() => { void handleDryRun() }}
+          disabled={dryRunLoading}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white transition-colors shadow-sm"
+        >
+          {dryRunLoading
+            ? (
+              <>
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                กำลังตรวจสอบ…
+              </>
+            )
+            : '🧪 ทดสอบส่งออก (Dry-run)'
+          }
+        </button>
       </div>
+
+      {/* F12: Dry-run result panel */}
+      {dryRunPanelVisible && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="px-5 py-3 bg-gray-50 border-b flex items-center justify-between">
+            <span className="font-semibold text-sm text-gray-800">ผลการทดสอบส่งออก (Dry-run)</span>
+            <button
+              type="button"
+              onClick={() => setDryRunPanelVisible(false)}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              ✕ ปิด
+            </button>
+          </div>
+
+          {/* Loading */}
+          {dryRunLoading && (
+            <div className="p-8 flex justify-center items-center">
+              <div className="flex items-center gap-3 text-gray-500 text-sm">
+                <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span>กำลังจำลองการส่งออก…</span>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {!dryRunLoading && dryRunError && (
+            <div className="p-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                เกิดข้อผิดพลาด: {dryRunError}
+              </div>
+            </div>
+          )}
+
+          {/* Results */}
+          {!dryRunLoading && (dryRunBasic || dryRunEclaim) && (
+            <div className="p-4 space-y-3">
+              {dryRunBasic && (
+                <DryRunRegistryPanel result={dryRunBasic} registryLabel="43 แฟ้ม (Basic Config)" />
+              )}
+              {dryRunEclaim && (
+                <DryRunRegistryPanel result={dryRunEclaim} registryLabel="E-Claim Config" />
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Error banner */}
       {errorMsg && (

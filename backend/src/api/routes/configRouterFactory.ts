@@ -22,6 +22,8 @@ import { matchRow, searchRowsAcross } from '../../services/search'
 import type { SearchRow } from '../../services/search'
 import { summarizeCounts } from '../../services/dashboard'
 import type { SummaryRow } from '../../services/dashboard'
+import { buildDryRunResult } from '../../services/dryrun'
+import type { DryRunCategoryInput } from '../../services/dryrun'
 
 // Backward-compatible body schema: at least one of std_code, std_code2, or extra must be present
 // max(50) accommodates 24-char TMT drug codes and other longer standard codes.
@@ -312,6 +314,50 @@ export function makeConfigRouter(
       const totalMatches = groups.reduce((sum, g) => sum + g.count, 0)
 
       res.json({ q, totalMatches, skippedPending, groups, errors })
+    } catch (err) { next(err) }
+  })
+
+  // ── GET /_dryrun — dry-run export simulation (F12) ──────────────────────────
+  // Registered BEFORE /:category so the literal path never collides with a param.
+  // For each non-pending category: runs buildListSql(c), identifies unmapped rows.
+  // Pending categories → { pending:true } (not queried, not counted toward status).
+  // Per-category try/catch → { error:true }; batch never 500s.
+  router.get('/_dryrun', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const reg = registryName ?? 'basic'
+      const categories = list()
+      const sampleLimit = 15
+
+      const catInputs: DryRunCategoryInput[] = []
+
+      for (const cat of categories) {
+        if (cat.pending) {
+          catInputs.push({ key: cat.key, label: cat.label, pending: true })
+          continue
+        }
+
+        const c = get(cat.key)
+        if (!c) {
+          catInputs.push({ key: cat.key, label: cat.label, error: true })
+          continue
+        }
+
+        try {
+          const { rows: rawRows } = await query(buildListSql(c))
+          catInputs.push({
+            key: cat.key,
+            label: cat.label,
+            rows: rawRows as DryRunCategoryInput['rows'],
+          })
+        } catch (catErr) {
+          const errMsg = catErr instanceof Error ? catErr.message : String(catErr)
+          console.error(`[_dryrun/${reg}] category ${cat.key} failed:`, errMsg)
+          catInputs.push({ key: cat.key, label: cat.label, error: true })
+        }
+      }
+
+      const result = buildDryRunResult(catInputs, sampleLimit, reg)
+      res.json(result)
     } catch (err) { next(err) }
   })
 
