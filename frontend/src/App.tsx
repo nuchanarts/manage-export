@@ -2,13 +2,14 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { ValidatePage } from './pages/ValidatePage'
 import { BasicConfigPage } from './pages/BasicConfigPage'
 import { EClaimConfigPage } from './pages/EClaimConfigPage'
+import { DrugCatalogPage } from './pages/DrugCatalogPage'
 import { NhsoLinksPage } from './pages/NhsoLinksPage'
 import { HelpPage } from './pages/HelpPage'
 import { KnowledgePage } from './pages/KnowledgePage'
 import { THEMES, getStoredTheme, storeTheme } from './theme/theme'
 import { getOrCreateClientId } from './utils/clientId'
 
-type MenuKey = 'validate' | 'basic-config' | 'eclaim-config' | 'nhso-links' | 'help' | 'knowledge'
+type MenuKey = 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge'
 
 interface NavItem {
   key: MenuKey
@@ -53,6 +54,13 @@ const NAV: NavItem[] = [
         icon: '💳',
         label: 'ตั้งค่าข้อมูลพื้นฐาน ส่ง E-Claim',
         sublabel: 'สิทธิ, คลินิก, ยา, ค่าบริการ',
+        ready: true,
+      },
+      {
+        key: 'drug-catalog',
+        icon: '💊',
+        label: 'Drug Catalog Export',
+        sublabel: 'ส่งออกแคตตาล็อกยา',
         ready: true,
       },
     ],
@@ -285,6 +293,7 @@ export function App() {
           {activeMenu === 'nhso-links' && <NhsoLinksPage />}
           {activeMenu === 'basic-config' && <BasicConfigPage />}
           {activeMenu === 'eclaim-config' && <EClaimConfigPage />}
+          {activeMenu === 'drug-catalog' && <DrugCatalogPage />}
           {activeMenu === 'help' && <HelpPage />}
           {activeMenu === 'knowledge' && <KnowledgePage />}
         </main>

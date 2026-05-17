@@ -4,6 +4,7 @@ import validateRouter from './validate'
 import basicConfigRouter from './basicConfig'
 import eclaimConfigRouter from './eclaimConfig'
 import presenceRouter from './presence'
+import drugCatalogRouter from './drugCatalog'
 
 const router = Router()
 
@@ -16,5 +17,6 @@ router.use('/validate', validateRouter)
 router.use('/basic-config', basicConfigRouter)
 router.use('/eclaim-config', eclaimConfigRouter)
 router.use('/presence', presenceRouter)
+router.use('/drug-catalog', drugCatalogRouter)
 
 export default router
