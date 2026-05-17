@@ -73,13 +73,13 @@ export const ECLAIM_REGISTRY: CategoryDef[] = [
     field1Label: 'ประเภทโรค', field2Label: 'ประเภทกิจกรรม',
     pending: false },
 
-  // aligned with 43-file drug-ned-reason — fixed national NED reference list (EA–EF), read-only by design (owner decision 2026-05-17).
-  // pending:true blocks all writes via the pending-guard (400 PENDING_CATEGORY); buildListSql still runs so the list displays read-only in the UI (amber dot).
-  // Editing via the Thai `doctor_reason` key caused audit garbling + accidental wipes — must NOT be hospital-editable.
+  // aligned with 43-file drug-ned-reason — hospital-editable per owner decision 2026-05-18 with 2-char safeguard.
+  // Prior wipe/garble vector mitigated by stdRule (aligned with 43-file drug-ned-reason): non-empty must be exactly 2 alphanumerics; empty still allowed (clear).
   { key: 'eclaim-drug-ned', label: 'เหตุผลการสั่งยา NED',
     table: 'drugitems_ned_reason_list', pk: 'doctor_reason', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
-    pending: true, hideCodeCol: true },
+    pending: false, hideCodeCol: true,
+    stdRule: { pattern: '^[A-Za-z0-9]{2}$', message: 'รหัส NED ต้องเป็นตัวอักษร/ตัวเลข 2 หลัก (เช่น EA, EB)' } },
 ]
 
 export function getEclaimCategory(key: string): CategoryDef | undefined {

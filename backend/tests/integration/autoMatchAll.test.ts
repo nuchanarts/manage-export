@@ -183,23 +183,26 @@ describe('POST /api/basic-config/_auto-match-all — basic flow', () => {
 // ─── Pending categories are SKIPPED ──────────────────────────────────────────
 
 describe('POST /api/basic-config/_auto-match-all — pending categories skipped', () => {
-  it('does not issue any query for pending categories', async () => {
-    // drug-ned-reason is now pending:true (read-only national NED reference list, owner decision 2026-05-17).
-    // The route skips pending categories (skippedPending:true in results) and excludes them from totalCategories.
-    // results array includes ALL categories (including pending ones as skipped entries);
-    // totalCategories counts only non-pending categories.
+  it('drug-ned-reason is now non-pending (editable, owner 2026-05-18) — processed, not skipped', async () => {
+    // drug-ned-reason is now pending:false (editable with 2-char stdRule, owner decision 2026-05-18).
+    // The route no longer skips it; it is processed like any other non-pending category.
+    // All basic-config categories are now non-pending: skippedPending list must be empty.
     mockQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 
     const res = await request(app).post('/api/basic-config/_auto-match-all')
     expect(res.status).toBe(200)
-    // results includes pending entries with skippedPending:true
+
+    // No entries should be skipped as pending in the basic registry
     const skippedPending = res.body.results.filter((r: { skippedPending?: boolean }) => r.skippedPending === true)
-    expect(skippedPending.length).toBeGreaterThanOrEqual(1)
-    // drug-ned-reason must appear as skipped
-    const nedEntry = skippedPending.find((r: { category: string }) => r.category === 'drug-ned-reason')
+    expect(skippedPending.length).toBe(0)
+
+    // drug-ned-reason must appear as a normal (processed) result entry, not skipped
+    const nedEntry = res.body.results.find((r: { category: string }) => r.category === 'drug-ned-reason')
     expect(nedEntry).toBeDefined()
-    // totalCategories counts only non-pending categories; results.length >= totalCategories
-    expect(res.body.results.length).toBeGreaterThanOrEqual(res.body.totalCategories)
+    expect(nedEntry.skippedPending).toBeFalsy()
+
+    // totalCategories counts all categories (all non-pending); results.length equals totalCategories
+    expect(res.body.results.length).toBe(res.body.totalCategories)
   })
 })
 

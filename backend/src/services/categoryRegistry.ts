@@ -221,13 +221,14 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     stdTable: 'drugitems_register', stdCodeCol: 'std_code', stdNameCol: 'drugname',
     pending: false,
     stdRule: { pattern: '^[0-9A-Za-z]{24}$', message: 'รหัสยา 24 หลัก ต้องมี 24 ตัวอักษร/ตัวเลข' } },
-  // drugitems_ned_reason_list(doctor_reason PK, claim_control mapCol) — fixed national NED reference list (EA–EF), read-only by design (owner decision 2026-05-17).
-  // pending:true blocks all writes via the pending-guard (400 PENDING_CATEGORY); buildListSql still runs so the list displays read-only in the UI (amber dot).
-  // Editing via the Thai `doctor_reason` key caused audit garbling + accidental wipes — must NOT be hospital-editable.
+  // drugitems_ned_reason_list(doctor_reason PK, claim_control mapCol) — hospital-editable per owner decision 2026-05-18 with 2-char safeguard.
+  // Prior wipe/garble vector mitigated by stdRule: non-empty value must be exactly 2 alphanumerics (EA/EB-style); empty still allowed (clear).
+  // stdRule: { pattern: '^[A-Za-z0-9]{2}$' } blocks accidental empty-wipe from combobox blur and garbage values, constraining to EA/EB-style 2-char codes.
   { key: 'drug-ned-reason', label: 'เหตุผลการสั่งยา NED',
     table: 'drugitems_ned_reason_list', pk: 'doctor_reason', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
-    pending: true, hideCodeCol: true },
+    pending: false, hideCodeCol: true,
+    stdRule: { pattern: '^[A-Za-z0-9]{2}$', message: 'รหัส NED ต้องเป็นตัวอักษร/ตัวเลข 2 หลัก (เช่น EA, EB)' } },
   // diagtype(diagtype PK, name, nhso_code) -> provis_diagtype(code, name): nhso_code col distinct from pk; schema valid; NULL in demo but operator populates [verified 2026-05-17]
   { key: 'diagnosis-type', label: 'ประเภทการวินิจฉัย',
     table: 'diagtype', pk: 'diagtype', nameCol: 'name', mapCol: 'nhso_code',

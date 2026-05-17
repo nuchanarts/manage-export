@@ -89,22 +89,19 @@ describe('eclaimRegistry — integrity', () => {
     expect(new Set(keys).size).toBe(keys.length)
   })
 
-  it('pending entries are the known read-only national reference entries (eclaim-drug-ned)', () => {
-    // eclaim-drug-ned is pending:true (read-only national NED reference list, owner decision 2026-05-17).
-    // pending:true means read-only by design; the pending-guard blocks all writes (400 PENDING_CATEGORY).
-    // Note: for this category mapCol (claim_control) !== pk (doctor_reason) — distinct cols are valid for display;
-    // the read-only guarantee comes from the guard, not the mapCol===pk invariant.
-    const pendingEntries = ECLAIM_REGISTRY.filter(c => c.pending)
-    expect(pendingEntries.length).toBeGreaterThanOrEqual(1)
-    const pendingKeys = pendingEntries.map(c => c.key)
-    expect(pendingKeys).toContain('eclaim-drug-ned')
+  it('eclaim-drug-ned is no longer pending (editable with 2-char stdRule, owner decision 2026-05-18)', () => {
+    // eclaim-drug-ned was made editable again with stdRule { pattern: '^[A-Za-z0-9]{2}$' } as anti-wipe safeguard.
+    // mapCol (claim_control) !== pk (doctor_reason) — satisfies the non-pending mapCol!==pk invariant.
+    const entry = ECLAIM_REGISTRY.find(c => c.key === 'eclaim-drug-ned')
+    expect(entry).toBeDefined()
+    expect(entry!.pending).toBe(false)
+    expect(entry!.stdRule).toBeDefined()
+    expect(entry!.stdRule!.pattern).toBe('^[A-Za-z0-9]{2}$')
   })
 
-  it('non-pending entries have mapCol !== pk (safe to update)', () => {
-    // Non-pending entries (all except eclaim-drug-ned) must have mapCol distinct from pk.
-    // eclaim-drug-ned is excluded (pending:true — read-only by design).
-    const confirmed = ECLAIM_REGISTRY.filter(c => !c.pending)
-    for (const c of confirmed) {
+  it('all entries have mapCol !== pk (all now non-pending and safe to update)', () => {
+    // All entries in ECLAIM_REGISTRY are non-pending; mapCol must be distinct from pk for all.
+    for (const c of ECLAIM_REGISTRY) {
       expect(c.mapCol).not.toBe(c.pk)
     }
   })

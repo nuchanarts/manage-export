@@ -76,23 +76,27 @@ describe('GET /api/basic-config/_summary', () => {
     expect(res.body.totalUnmapped).toBeGreaterThanOrEqual(1)
   })
 
-  it('pending categories are included with pending:true and no counts', async () => {
-    // Return empty for all non-pending categories
+  it('drug-ned-reason is now non-pending (editable, owner 2026-05-18) — appears with counts in summary', async () => {
+    // drug-ned-reason is now pending:false (editable with 2-char stdRule, owner decision 2026-05-18).
+    // The summary must issue a DB query for it and return counts (pending:false means it gets total/mapped/unmapped).
     mockQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 
     const res = await request(app).get('/api/basic-config/_summary')
     expect(res.status).toBe(200)
 
-    // drug-ned-reason is pending:true (read-only national NED reference list, owner decision 2026-05-17).
-    // The summary includes it with pending:true and no counts (no DB query issued for pending categories).
-    const pendingCats = res.body.categories.filter((c: { pending: boolean }) => c.pending === true)
-    expect(pendingCats.length).toBeGreaterThanOrEqual(1)
+    // drug-ned-reason must appear as non-pending with counts
     const nedReason = res.body.categories.find((c: { key: string }) => c.key === 'drug-ned-reason')
     expect(nedReason).toBeTruthy()
-    expect(nedReason.pending).toBe(true)
-    expect(nedReason.total).toBeUndefined()
+    expect(nedReason.pending).toBe(false)
+    // Non-pending categories receive count fields from the DB query
+    expect(typeof nedReason.total).toBe('number')
+    expect(typeof nedReason.unmapped).toBe('number')
 
-    // Verify non-pending categories get counts (they may be 0 rows if mock returns empty)
+    // All categories in the basic registry are now non-pending
+    const pendingCats = res.body.categories.filter((c: { pending: boolean }) => c.pending === true)
+    expect(pendingCats.length).toBe(0)
+
+    // Verify occupation (a known non-pending category) also gets counts
     const occ = res.body.categories.find((c: { key: string }) => c.key === 'occupation')
     expect(occ).toBeTruthy()
     expect(occ.pending).toBe(false)
