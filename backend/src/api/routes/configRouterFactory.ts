@@ -18,6 +18,8 @@ import { mapHeaderRowToFields, normalizeCellValue } from '../../services/excelMa
 import { recordMappingChange, getAudit, getLastChange, resolveAuditField } from '../../services/auditService'
 import { autoMatchSuggestions } from '../../services/autoMatch'
 import type { AmRow, AmOption } from '../../services/autoMatch'
+import { matchRow, searchRowsAcross } from '../../services/search'
+import type { SearchRow } from '../../services/search'
 
 // Backward-compatible body schema: at least one of std_code, std_code2, or extra must be present
 // max(50) accommodates 24-char TMT drug codes and other longer standard codes.
@@ -184,6 +186,58 @@ export function makeConfigRouter(
         results,
         errors,
       })
+    } catch (err) { next(err) }
+  })
+
+  // ── GET /_search?q=...&limit= — global cross-category search (F7) ────────────
+  // Registered BEFORE /:category so the literal path never collides with a param.
+  router.get('/_search', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rawQ = req.query.q
+      const q = typeof rawQ === 'string' ? rawQ.trim() : ''
+      if (!q) {
+        throw new AppError(400, 'MISSING_QUERY', 'กรุณาระบุ q (query string) ที่มีอย่างน้อย 1 ตัวอักษร')
+      }
+
+      const rawLimit = req.query.limit
+      const parsedLimit = rawLimit !== undefined ? parseInt(String(rawLimit), 10) : 20
+      const limit = isNaN(parsedLimit) ? 20 : Math.min(Math.max(1, parsedLimit), 100)
+
+      const categories = list()
+      let skippedPending = 0
+      const errors: { category: string; error: string }[] = []
+
+      // Collect {key, label, rows} for searchRowsAcross — sequential queries
+      const categoryInputs: Parameters<typeof searchRowsAcross>[0] = []
+
+      for (const cat of categories) {
+        if (cat.pending) {
+          skippedPending++
+          continue
+        }
+        const c = get(cat.key)
+        if (!c) continue
+
+        try {
+          const { rows: rawRows } = await query(buildListSql(c))
+          categoryInputs.push({
+            key: cat.key,
+            label: cat.label,
+            rows: rawRows as SearchRow[],
+          })
+        } catch (catErr) {
+          const errMsg = catErr instanceof Error ? catErr.message : String(catErr)
+          console.error(`[_search] category ${cat.key} failed:`, errMsg)
+          errors.push({ category: cat.key, error: errMsg })
+          // resilient: continue to next category
+        }
+      }
+
+      // Pure in-memory filtering via matchRow
+      const groups = searchRowsAcross(categoryInputs, q, limit)
+      const totalMatches = groups.reduce((sum, g) => sum + g.count, 0)
+
+      res.json({ q, totalMatches, skippedPending, groups, errors })
     } catch (err) { next(err) }
   })
 

@@ -6,10 +6,11 @@ import { DrugCatalogPage } from './pages/DrugCatalogPage'
 import { NhsoLinksPage } from './pages/NhsoLinksPage'
 import { HelpPage } from './pages/HelpPage'
 import { KnowledgePage } from './pages/KnowledgePage'
+import { GlobalSearchPage } from './pages/GlobalSearchPage'
 import { THEMES, getStoredTheme, storeTheme } from './theme/theme'
 import { getOrCreateClientId } from './utils/clientId'
 
-type MenuKey = 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge'
+type MenuKey = 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge' | 'global-search'
 
 interface NavItem {
   key: MenuKey
@@ -42,6 +43,13 @@ const NAV: NavItem[] = [
     label: 'ตั้งค่าข้อมูลพื้นฐาน',
     ready: true,
     children: [
+      {
+        key: 'global-search',
+        icon: '🔎',
+        label: 'ค้นหาข้ามหมวด',
+        sublabel: 'หารหัส/ชื่อทุกหมวด',
+        ready: true,
+      },
       {
         key: 'basic-config',
         icon: '🗂️',
@@ -296,6 +304,7 @@ export function App() {
           {activeMenu === 'drug-catalog' && <DrugCatalogPage />}
           {activeMenu === 'help' && <HelpPage />}
           {activeMenu === 'knowledge' && <KnowledgePage />}
+          {activeMenu === 'global-search' && <GlobalSearchPage />}
         </main>
       </div>
     </div>
