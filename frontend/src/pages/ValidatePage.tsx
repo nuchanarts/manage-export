@@ -28,7 +28,7 @@ function SchemaPanel({ fields, fileName, description, fileMeta, compact }: {
     <>
       <div className="bg-blue-800 text-white px-3 py-2.5">
         <p className="font-bold text-sm">
-          {fileMeta.fileNumber > 0 ? `(${fileMeta.fileNumber}) ` : ''}{fileName}
+          {fileMeta.fileNumber > 0 ? `(${fileMeta.fileNumber}) ` : ''}{fileName.replace(/\.txt$/i, '')}
           <span className="ml-1.5 text-[11px] font-normal text-blue-300">version 3.1.1</span>
         </p>
         {fileMeta.definition && (
@@ -134,7 +134,7 @@ function SchemaTooltip({ fields, fileName, description, fileMeta }: {
       onMouseLeave={() => setShow(false)}
     >
       <span className="font-mono text-xs font-semibold text-gray-800 cursor-help border-b border-dotted border-blue-400 hover:text-blue-700">
-        {fileName}
+        {fileName.replace(/\.txt$/i, '')}
       </span>
 
       {show && (
@@ -259,9 +259,9 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
       </tr></thead><tbody>${rows}</tbody></table>`
     }
 
-    w.document.write(`<html><head><title>${tabLabel} - ${file.fileName}</title>
+    w.document.write(`<html><head><title>${tabLabel} - ${file.fileName.replace(/\.txt$/i, '')}</title>
       <style>body{font-family:sans-serif;font-size:11px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:3px 6px}h2,h3{color:#1e3a8a}</style></head>
-      <body><h2>${file.fileName} — ${file.description} — ${tabLabel}</h2>
+      <body><h2>${file.fileName.replace(/\.txt$/i, '')} — ${file.description} — ${tabLabel}</h2>
       <p>HOSPCODE: ${hospcode} | ทั้งหมด: ${file.totalPersons} คน | ผ่าน: ${file.passPersons} คน | ไม่ผ่าน: ${file.failPersons} คน | ร้อยละ: ${file.passPercent}%</p>
       ${file.missingColumns.length > 0 ? `<p style="color:red">คอลัมน์ขาด: ${file.missingColumns.join(', ')}</p>` : ''}
       ${body}</body></html>`)
@@ -280,7 +280,7 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b bg-blue-700 rounded-t-xl text-white">
           <div>
-            <h3 className="font-bold text-lg">{file.fileName}</h3>
+            <h3 className="font-bold text-lg">{file.fileName.replace(/\.txt$/i, '')}</h3>
             {file.description && <p className="text-blue-200 text-sm mt-0.5">{file.description}</p>}
             <div className="flex gap-4 text-sm text-blue-100 mt-0.5">
               <span>ทั้งหมด: <strong className="text-white">{file.totalPersons.toLocaleString()} คน</strong></span>
@@ -667,7 +667,7 @@ export function ValidatePage() {
     if (!w) return
     const rows = report.files.map((f, i) => `
       <tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
-        <td>${f.fileName}</td>
+        <td>${f.fileName.replace(/\.txt$/i, '')}</td>
         <td>${f.fileMeta?.fileType ?? ''}</td>
         <td style="text-align:right">${f.totalRows.toLocaleString()}</td>
         <td style="text-align:right;color:#15803d">${f.passPersons.toLocaleString()}</td>
