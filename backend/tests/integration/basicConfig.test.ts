@@ -45,11 +45,58 @@ describe('basic-config routes', () => {
   })
 
   it('PUT to a pending category → 400 PENDING_CATEGORY (no DB call needed)', async () => {
-    // 'clinic' is pending:true in the registry
-    const res = await request(app).put('/api/basic-config/clinic/001').send({ std_code: '001' })
+    // 'person-type' is pending:true in the registry
+    const res = await request(app).put('/api/basic-config/person-type/001').send({ std_code: '001' })
     expect(res.status).toBe(400)
     expect(res.body.error).toBe('PENDING_CATEGORY')
     // Guard fires before any DB call — mock should never have been invoked
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  // ── Dual-field clinic tests ───────────────────────────────────────────────
+
+  it('GET /api/basic-config/clinic/std-options2 returns rows', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ code: '001', name: 'Activity One' }],
+      rowCount: 1,
+    })
+    const res = await request(app).get('/api/basic-config/clinic/std-options2')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+  })
+
+  it('GET std-options2 for a non-dual category → 404', async () => {
+    const res = await request(app).get('/api/basic-config/occupation/std-options2')
+    expect(res.status).toBe(404)
+  })
+
+  it('PUT /api/basic-config/clinic/:code with {std_code2} updates oapp_activity_id', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 }) // existence check
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                     // update
+    const res = await request(app)
+      .put('/api/basic-config/clinic/CLI01')
+      .send({ std_code2: 'ACT99' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true })
+    const updateCall = mockQuery.mock.calls[1]
+    expect(updateCall[0]).toContain('UPDATE `clinic` SET `oapp_activity_id` = ?')
+    expect(updateCall[1]).toEqual(['ACT99', 'CLI01'])
+  })
+
+  it('PUT with {std_code2} to a non-dual category → 400', async () => {
+    const res = await request(app)
+      .put('/api/basic-config/occupation/05')
+      .send({ std_code2: 'X' })
+    expect(res.status).toBe(400)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('PUT with empty body → 400', async () => {
+    const res = await request(app)
+      .put('/api/basic-config/clinic/CLI01')
+      .send({})
+    expect(res.status).toBe(400)
     expect(mockQuery).not.toHaveBeenCalled()
   })
 })

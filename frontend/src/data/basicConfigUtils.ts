@@ -4,6 +4,14 @@ export interface BasicRow {
   std_code: string | null
   std_name: string | null
   mapped: boolean
+  // Optional secondary mapping fields (present for dual categories only)
+  std_code2?: string | null
+  std_name2?: string | null
+}
+
+/** Returns true if a row has secondary mapping data (std_code2 key is present) */
+export function isDualRow(row: BasicRow): boolean {
+  return 'std_code2' in row
 }
 
 export function isUnmapped(row: BasicRow): boolean {

@@ -1,5 +1,6 @@
 import {
   CategoryDef,
+  CategoryListItem,
   buildListSql,
   buildStdOptionsSql,
   buildUpdateSql,
@@ -65,6 +66,13 @@ export function getEclaimCategory(key: string): CategoryDef | undefined {
   return ECLAIM_REGISTRY.find(c => c.key === key)
 }
 
-export function listEclaimCategories(): Pick<CategoryDef, 'key' | 'label' | 'pending'>[] {
-  return ECLAIM_REGISTRY.map(({ key, label, pending }) => ({ key, label, pending }))
+export function listEclaimCategories(): CategoryListItem[] {
+  return ECLAIM_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label }) => ({
+    key,
+    label,
+    pending,
+    dual: !!mapCol2,
+    ...(field1Label !== undefined ? { field1Label } : {}),
+    ...(field2Label !== undefined ? { field2Label } : {}),
+  }))
 }

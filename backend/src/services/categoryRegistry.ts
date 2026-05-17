@@ -4,11 +4,18 @@ export interface CategoryDef {
   table: string      // HIS master table
   pk: string         // PK / local code column
   nameCol: string    // local display-name column
-  mapCol: string     // the ONLY writable column (local -> standard mapping)
-  stdTable: string   // provis_* standard reference table
+  mapCol: string     // primary writable column (local -> standard mapping)
+  stdTable: string   // provis_* standard reference table (primary)
   stdCodeCol: string // standard code column in stdTable
   stdNameCol: string // standard name column in stdTable
   pending: boolean   // true = table/column not yet confirmed against the DB
+  // ── Optional secondary mapping (dual-field categories only) ──────────────
+  mapCol2?: string        // secondary writable column in `table`
+  stdTable2?: string      // secondary standard reference table
+  stdCodeCol2?: string    // standard code column in stdTable2
+  stdNameCol2?: string    // standard name column in stdTable2
+  field1Label?: string    // UI column header for primary mapping
+  field2Label?: string    // UI column header for secondary mapping
 }
 
 // Confirmed against the live HOSxP `demo` schema probe (2026-05-16/17).
@@ -135,11 +142,14 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'icd10',
     stdTable: 'icd101', stdCodeCol: 'code', stdNameCol: 'name',
     pending: false },
-  // clinic(clinic PK, name): clinic code IS pk; no separate nhso/export/std col exists on master [verified 2026-05-17; depcode/oldcode/sss_clinic_code unrelated to nhso_clinic.code]
+  // clinic(clinic PK, name, icd10, oapp_activity_id) -> icd101(code, name) + oapp_activity(oapp_activity_id, oapp_activity_name)
+  // [probe-verified 2026-05-17: mapCol icd10 distinct from pk; mapCol2 oapp_activity_id distinct from pk; both std tables confirmed]
   { key: 'clinic', label: 'คลินิก',
-    table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'clinic',
-    stdTable: 'nhso_clinic', stdCodeCol: 'code', stdNameCol: 'name',
-    pending: true },
+    table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'icd10',
+    stdTable: 'icd101', stdCodeCol: 'code', stdNameCol: 'name',
+    mapCol2: 'oapp_activity_id', stdTable2: 'oapp_activity', stdCodeCol2: 'oapp_activity_id', stdNameCol2: 'oapp_activity_name',
+    field1Label: 'ประเภทโรค', field2Label: 'ประเภทกิจกรรม',
+    pending: false },
   // drugitems(icode PK, name, did=24-digit std code) -> drugitems_register(std_code, drugname)  [owner-specified 2026-05-17: 24 หลัก = drugitems.did; did distinct from pk icode; ncd24 does NOT exist; std name is plain drugname (full CONCAT format not expressible by generic builder)]
   { key: 'drug-list', label: 'รายการยา',
     table: 'drugitems', pk: 'icode', nameCol: 'name', mapCol: 'did',
@@ -186,8 +196,24 @@ export function getCategory(key: string): CategoryDef | undefined {
   return CATEGORY_REGISTRY.find(c => c.key === key)
 }
 
-export function listCategories(): Pick<CategoryDef, 'key' | 'label' | 'pending'>[] {
-  return CATEGORY_REGISTRY.map(({ key, label, pending }) => ({ key, label, pending }))
+export interface CategoryListItem {
+  key: string
+  label: string
+  pending: boolean
+  dual: boolean
+  field1Label?: string
+  field2Label?: string
+}
+
+export function listCategories(): CategoryListItem[] {
+  return CATEGORY_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label }) => ({
+    key,
+    label,
+    pending,
+    dual: !!mapCol2,
+    ...(field1Label !== undefined ? { field1Label } : {}),
+    ...(field2Label !== undefined ? { field2Label } : {}),
+  }))
 }
 
 // All identifiers below come from CategoryDef (registry), never from request input.
@@ -199,16 +225,27 @@ function ident(name: string): string {
 export function buildListSql(c: CategoryDef): string {
   const m = ident(c.table)
   const s = ident(c.stdTable)
-  return (
+  let sql =
     `SELECT ${m}.${ident(c.pk)} AS code, ` +
     `${m}.${ident(c.nameCol)} AS name, ` +
     `${m}.${ident(c.mapCol)} AS std_code, ` +
     `${s}.${ident(c.stdNameCol)} AS std_name, ` +
-    `(${s}.${ident(c.stdCodeCol)} IS NOT NULL) AS mapped ` +
-    `FROM ${m} ` +
-    `LEFT JOIN ${s} ON ${m}.${ident(c.mapCol)} = ${s}.${ident(c.stdCodeCol)} ` +
-    `ORDER BY ${m}.${ident(c.pk)}`
-  )
+    `(${s}.${ident(c.stdCodeCol)} IS NOT NULL) AS mapped`
+  if (c.mapCol2 && c.stdTable2 && c.stdCodeCol2 && c.stdNameCol2) {
+    const s2 = ident(c.stdTable2)
+    sql +=
+      `, ${m}.${ident(c.mapCol2)} AS std_code2` +
+      `, ${s2}.${ident(c.stdNameCol2)} AS std_name2`
+  }
+  sql +=
+    ` FROM ${m} ` +
+    `LEFT JOIN ${s} ON ${m}.${ident(c.mapCol)} = ${s}.${ident(c.stdCodeCol)}`
+  if (c.mapCol2 && c.stdTable2 && c.stdCodeCol2) {
+    const s2 = ident(c.stdTable2)
+    sql += ` LEFT JOIN ${s2} ON ${m}.${ident(c.mapCol2)} = ${s2}.${ident(c.stdCodeCol2!)}`
+  }
+  sql += ` ORDER BY ${m}.${ident(c.pk)}`
+  return sql
 }
 
 export function buildStdOptionsSql(c: CategoryDef): string {
@@ -223,6 +260,30 @@ export function buildUpdateSql(
 ): { sql: string; params: (string | null)[] } {
   return {
     sql: `UPDATE ${ident(c.table)} SET ${ident(c.mapCol)} = ? WHERE ${ident(c.pk)} = ?`,
+    params: [stdCode === '' ? null : stdCode, code],
+  }
+}
+
+/** Only valid for dual categories (mapCol2 set). Builds UPDATE for secondary mapping. */
+export function buildStdOptionsSql2(c: CategoryDef): string {
+  if (!c.stdTable2 || !c.stdCodeCol2 || !c.stdNameCol2) {
+    throw new Error(`buildStdOptionsSql2: category '${c.key}' is not dual`)
+  }
+  return (
+    `SELECT ${ident(c.stdCodeCol2)} AS code, ${ident(c.stdNameCol2)} AS name ` +
+    `FROM ${ident(c.stdTable2)} ORDER BY ${ident(c.stdCodeCol2)}`
+  )
+}
+
+/** Only valid for dual categories (mapCol2 set). Builds UPDATE for secondary mapping. */
+export function buildUpdateSql2(
+  c: CategoryDef, code: string, stdCode: string
+): { sql: string; params: (string | null)[] } {
+  if (!c.mapCol2) {
+    throw new Error(`buildUpdateSql2: category '${c.key}' is not dual`)
+  }
+  return {
+    sql: `UPDATE ${ident(c.table)} SET ${ident(c.mapCol2)} = ? WHERE ${ident(c.pk)} = ?`,
     params: [stdCode === '' ? null : stdCode, code],
   }
 }

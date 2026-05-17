@@ -10,6 +10,16 @@ import {
   StdOption,
 } from '../../data/basicConfigUtils'
 
+// ─── Menu item type (additive: dual + optional labels) ────────────────────────
+interface MenuItem {
+  key: string
+  label: string
+  pending: boolean
+  dual?: boolean
+  field1Label?: string
+  field2Label?: string
+}
+
 // ─── StdCombobox ─────────────────────────────────────────────────────────────
 function StdCombobox({
   value,
@@ -151,9 +161,10 @@ function DataTable({
   menu,
   apiBase,
 }: {
-  menu: { key: string; label: string; pending: boolean }
+  menu: MenuItem
   apiBase: string
 }) {
+  const isDual = !!menu.dual
   const qc = useQueryClient()
   const { data: rows = [], isLoading, isError } = useQuery({
     queryKey: [apiBase, menu.key],
@@ -165,9 +176,21 @@ function DataTable({
     queryFn: () => axios.get<StdOption[]>(`${apiBase}/${menu.key}/std-options`).then(r => r.data),
     staleTime: 300_000,
   })
+  // Secondary options — only fetched for dual categories
+  const { data: opts2 = [] } = useQuery({
+    queryKey: [`${apiBase}-opts2`, menu.key],
+    queryFn: () => axios.get<StdOption[]>(`${apiBase}/${menu.key}/std-options2`).then(r => r.data),
+    staleTime: 300_000,
+    enabled: isDual,
+  })
   const save = useMutation({
     mutationFn: (v: { code: string; std_code: string }) =>
       axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { std_code: v.std_code }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [apiBase, menu.key] }),
+  })
+  const save2 = useMutation({
+    mutationFn: (v: { code: string; std_code2: string }) =>
+      axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { std_code2: v.std_code2 }),
     onSuccess: () => qc.invalidateQueries({ queryKey: [apiBase, menu.key] }),
   })
 
@@ -255,12 +278,19 @@ function DataTable({
             <tr>
               <th className="text-left px-3 py-2 font-medium w-20">รหัส</th>
               <th className="text-left px-3 py-2 font-medium w-56">ชื่อ (HIS)</th>
-              <th className="text-left px-3 py-2 font-medium">รหัสมาตรฐาน</th>
+              <th className="text-left px-3 py-2 font-medium">
+                {isDual ? (menu.field1Label ?? 'รหัสมาตรฐาน 1') : 'รหัสมาตรฐาน'}
+              </th>
+              {isDual && (
+                <th className="text-left px-3 py-2 font-medium">
+                  {menu.field2Label ?? 'รหัสมาตรฐาน 2'}
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {displayedRows.length === 0 ? (
-              <tr><td colSpan={3} className="px-4 py-8 text-center text-gray-400">ไม่พบข้อมูล</td></tr>
+              <tr><td colSpan={isDual ? 4 : 3} className="px-4 py-8 text-center text-gray-400">ไม่พบข้อมูล</td></tr>
             ) : displayedRows.map(row => (
               <tr key={row.code} className={isUnmapped(row) ? 'bg-red-50' : 'bg-white'}>
                 <td className="px-3 py-2 text-gray-700">{row.code}</td>
@@ -279,6 +309,19 @@ function DataTable({
                     />
                   )}
                 </td>
+                {isDual && (
+                  <td className="px-3 py-2">
+                    {menu.pending ? (
+                      <span className="text-gray-500">{row.std_code2 ?? '—'}</span>
+                    ) : (
+                      <StdCombobox
+                        value={row.std_code2 ?? ''}
+                        options={opts2}
+                        onChange={(std_code2) => save2.mutate({ code: row.code, std_code2 })}
+                      />
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -300,7 +343,7 @@ export function ConfigCatalog({ apiBase, sidebarTitle }: ConfigCatalogProps) {
   const { data: menus = [] } = useQuery({
     queryKey: [`${apiBase}-menus`],
     queryFn: () =>
-      axios.get<{ key: string; label: string; pending: boolean }[]>(apiBase).then(r => r.data),
+      axios.get<MenuItem[]>(apiBase).then(r => r.data),
     staleTime: 300_000,
   })
 
