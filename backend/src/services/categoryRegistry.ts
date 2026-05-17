@@ -345,3 +345,36 @@ export function buildUpdateSql2(
 export function buildExistsSql(c: CategoryDef): string {
   return `SELECT 1 FROM ${ident(c.table)} WHERE ${ident(c.pk)} = ? LIMIT 1`
 }
+
+/**
+ * Returns a parameterized SELECT for reading the current value of a specific
+ * mapping field before overwriting it (used to populate the audit old_value).
+ *
+ * fieldSelector must be one of: 'std_code' | 'std_code2' | `std_code_e${number}`
+ * These are translated back to the actual column via the allow-listed CategoryDef.
+ * Throws if the fieldSelector is unrecognised or the column doesn't exist on c.
+ */
+export function buildSelectCurrentSql(
+  c: CategoryDef,
+  fieldSelector: 'std_code' | 'std_code2' | `std_code_e${number}`,
+): { sql: string; col: string } {
+  let col: string
+  if (fieldSelector === 'std_code') {
+    col = c.mapCol
+  } else if (fieldSelector === 'std_code2') {
+    if (!c.mapCol2) throw new Error(`buildSelectCurrentSql: category '${c.key}' has no mapCol2`)
+    col = c.mapCol2
+  } else if (/^std_code_e\d+$/.test(fieldSelector)) {
+    const idx = parseInt(fieldSelector.slice('std_code_e'.length), 10)
+    const ef = c.extraFields?.[idx]
+    if (!ef) throw new Error(`buildSelectCurrentSql: category '${c.key}' has no extraFields[${idx}]`)
+    col = ef.mapCol
+  } else {
+    throw new Error(`buildSelectCurrentSql: unrecognised fieldSelector '${fieldSelector}'`)
+  }
+  // col comes from the registry (allow-listed via CategoryDef); ident() validates charset
+  return {
+    sql: `SELECT ${ident(col)} AS current_val FROM ${ident(c.table)} WHERE ${ident(c.pk)} = ? LIMIT 1`,
+    col,
+  }
+}

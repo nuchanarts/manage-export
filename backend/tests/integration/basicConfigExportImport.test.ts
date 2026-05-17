@@ -146,10 +146,15 @@ describe('POST /api/basic-config/:category/import', () => {
 
   it('processes a simple xlsx and returns summary {updated, skipped, errors}', async () => {
     // Row 05 exists; row 99 does not → 1 updated, 1 skipped
+    // Call order per existing code: exists('05'), select-current('05'), UPDATE('05'),
+    //   ensureAuditTable, auditINSERT, exists('99') → 0
     mockQuery
       .mockResolvedValueOnce({ rows: [{ occupation: '05' }], rowCount: 1 }) // exists check for '05'
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                      // UPDATE for '05'
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })                      // exists check for '99' → not found
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 }) // select-current for '05'
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // UPDATE for '05'
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })                       // ensureAuditTable
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // audit INSERT for '05'
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })                       // exists check for '99' → not found
 
     const buf = await makeXlsx(
       ['รหัส (HIS)', 'ชื่อ (HIS)', 'รหัสมาตรฐาน'],
@@ -168,9 +173,12 @@ describe('POST /api/basic-config/:category/import', () => {
   })
 
   it('runs UPDATE with correct SQL and parameterized values', async () => {
+    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE, calls[3]=ensure, calls[4]=auditINSERT
     mockQuery
       .mockResolvedValueOnce({ rows: [{ occupation: '05' }], rowCount: 1 }) // exists
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                      // update
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 }) // select-current
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // update
+      .mockResolvedValue({ rows: [], rowCount: 0 })                           // ensure + audit INSERT
     const buf = await makeXlsx(
       ['รหัส (HIS)', 'ชื่อ (HIS)', 'รหัสมาตรฐาน'],
       [['05', 'เกษตรกร', '0510']],
@@ -180,15 +188,18 @@ describe('POST /api/basic-config/:category/import', () => {
       .attach('file', buf, 'test.xlsx')
     expect(res.status).toBe(200)
     expect(res.body.updated).toBe(1)
-    const updateCall = mockQuery.mock.calls[1]
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[0]).toContain('UPDATE `occupation` SET `nhso_code` = ?')
     expect(updateCall[1]).toEqual(['0510', '05'])
   })
 
   it('empty std_code cell → sets NULL', async () => {
+    // old='some_val', new=null → audit is written (not a no-op)
     mockQuery
       .mockResolvedValueOnce({ rows: [{ occupation: '05' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ current_val: 'OLD_CODE' }], rowCount: 1 }) // select-current
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValue({ rows: [], rowCount: 0 })                                 // ensure + audit
     const buf = await makeXlsx(
       ['รหัส (HIS)', 'รหัสมาตรฐาน'],
       [['05', '']],
@@ -197,7 +208,8 @@ describe('POST /api/basic-config/:category/import', () => {
       .post('/api/basic-config/occupation/import')
       .attach('file', buf, 'test.xlsx')
     expect(res.status).toBe(200)
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[2] is the UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[1][0]).toBeNull()
     expect(updateCall[1][1]).toBe('05')
   })
@@ -233,9 +245,18 @@ describe('POST /api/basic-config/:category/import', () => {
   })
 
   it('dual category import updates std_code2 column', async () => {
+    // Xlsx has ประเภทโรค (std_code, empty '') and ประเภทกิจกรรม (std_code2, 'ACT42').
+    // For std_code (empty → null, old=null → no-op, audit skipped):
+    //   exists(CLI01), select-current(std_code→null), UPDATE(std_code→null), audit no-op
+    // For std_code2 ('ACT42'):
+    //   select-current(std_code2→null), UPDATE(std_code2→ACT42), ensure, auditINSERT
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 }) // exists for std_code2 update
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                      // UPDATE std_code2
+      .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 })   // exists for CLI01
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 }) // select-current std_code
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // UPDATE std_code (→null, no-op on audit)
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 }) // select-current std_code2
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // UPDATE std_code2
+      .mockResolvedValue({ rows: [], rowCount: 0 })                           // ensure + audit INSERT for std_code2
     const buf = await makeXlsx(
       ['รหัส (HIS)', 'ชื่อ (HIS)', 'ประเภทโรค', 'ประเภทกิจกรรม'],
       [['CLI01', 'คลินิก', '', 'ACT42']], // only std_code2 provided
@@ -244,7 +265,7 @@ describe('POST /api/basic-config/:category/import', () => {
       .post('/api/basic-config/clinic/import')
       .attach('file', buf, 'test.xlsx')
     expect(res.status).toBe(200)
-    // At least one update should have happened for std_code2
+    // At least one update should have happened for std_code2 — filter by SQL content
     const calls = mockQuery.mock.calls
     const updateCalls = calls.filter(c => String(c[0]).startsWith('UPDATE'))
     expect(updateCalls.length).toBeGreaterThanOrEqual(1)
@@ -283,8 +304,10 @@ describe('POST /api/eclaim-config/:category/import', () => {
 
   it('returns 200 summary for eclaim-inscl import', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ pttype: 'OFC' }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ pttype: 'OFC' }], rowCount: 1 })      // exists
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 })  // select-current
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                        // UPDATE
+      .mockResolvedValue({ rows: [], rowCount: 0 })                            // ensure + audit INSERT
     const buf = await makeXlsx(
       ['รหัส (HIS)', 'ชื่อ (HIS)', 'รหัสมาตรฐาน'],
       [['OFC', 'ข้าราชการ', 'OFC']],

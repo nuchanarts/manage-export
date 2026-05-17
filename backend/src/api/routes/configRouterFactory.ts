@@ -11,8 +11,10 @@ import {
   buildListSql, buildStdOptionsSql, buildUpdateSql, buildExistsSql,
   buildStdOptionsSql2, buildUpdateSql2,
   buildStdOptionsSqlExtra, buildUpdateSqlExtra,
+  buildSelectCurrentSql,
 } from '../../services/categoryRegistry'
 import { mapHeaderRowToFields, normalizeCellValue } from '../../services/excelMappingIO'
+import { recordMappingChange, getAudit } from '../../services/auditService'
 
 // Backward-compatible body schema: at least one of std_code, std_code2, or extra must be present
 const bodySchema = z.object({
@@ -38,16 +40,23 @@ const uploadImport = multer({
 })
 
 /**
- * Factory that creates the five standard config routes:
- *   GET  /                        → list categories
- *   GET  /:category               → list rows for category
- *   GET  /:category/std-options   → list standard options (primary)
- *   GET  /:category/std-options2  → list standard options (secondary; dual only)
- *   PUT  /:category/:code         → update primary (std_code) or secondary (std_code2) mapping
+ * Factory that creates the standard config routes for a given registry.
  *
- * Both basic-config and eclaim-config use this factory; behaviour is identical.
+ *   GET  /                           → list categories
+ *   GET  /:category                  → list rows for category
+ *   GET  /:category/std-options      → list standard options (primary)
+ *   GET  /:category/std-options2     → list standard options (secondary; dual only)
+ *   GET  /:category/audit            → recent audit rows for category (F1)
+ *   PUT  /:category/:code            → update primary / secondary / extra mapping
+ *
+ * The optional `registryName` ('basic' | 'eclaim') enables audit logging (F1).
+ * Omitting it or passing undefined disables audit for that router instance
+ * (backward-compatible for any future test factories that don't set it).
  */
-export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
+export function makeConfigRouter(
+  { get, list }: ConfigRegistryFns,
+  registryName?: 'basic' | 'eclaim',
+): Router {
   const router = Router()
 
   router.get('/', (_req: Request, res: Response) => {
@@ -101,6 +110,20 @@ export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
         return
       }
       const { rows } = await query(sql)
+      res.json(rows)
+    } catch (err) { next(err) }
+  })
+
+  // ── GET /:category/audit — recent audit rows for this category (F1) ─────────
+  router.get('/:category/audit', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const category = String(req.params.category)
+      const c = get(category)
+      if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${category}`)
+      const limitRaw = req.query.limit
+      const limit = limitRaw !== undefined ? parseInt(String(limitRaw), 10) : 100
+      const reg = registryName ?? 'basic'
+      const rows = await getAudit(reg, category, isNaN(limit) ? 100 : limit)
       res.json(rows)
     } catch (err) { next(err) }
   })
@@ -189,6 +212,9 @@ export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
 
       const codeMapping = mappings.find(m => m.target.kind === 'code')
 
+      const actor = req.header('x-actor') || 'import'
+      const reg = registryName ?? 'basic'
+
       let updated = 0
       let skipped = 0
       const errors: string[] = []
@@ -221,20 +247,64 @@ export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
 
           try {
             if (m.target.kind === 'std_code') {
+              // Read current value for audit
+              let oldValue: string | null = null
+              if (registryName) {
+                try {
+                  const { sql: selSql } = buildSelectCurrentSql(c, 'std_code')
+                  const { rows: selRows } = await query(selSql, [code])
+                  oldValue = (selRows[0]?.current_val as string | null | undefined) ?? null
+                } catch { /* best-effort */ }
+              }
               const { sql, params } = buildUpdateSql(c, code, value)
               await query(sql, params)
               updated++
+              if (registryName) {
+                await recordMappingChange({
+                  registry: reg, category, code, field: 'std_code',
+                  oldValue, newValue: value === '' ? null : value, actor,
+                })
+              }
             } else if (m.target.kind === 'std_code2') {
               if (!c.mapCol2) continue // shouldn't happen given header mapping, but guard
+              let oldValue: string | null = null
+              if (registryName) {
+                try {
+                  const { sql: selSql } = buildSelectCurrentSql(c, 'std_code2')
+                  const { rows: selRows } = await query(selSql, [code])
+                  oldValue = (selRows[0]?.current_val as string | null | undefined) ?? null
+                } catch { /* best-effort */ }
+              }
               const { sql, params } = buildUpdateSql2(c, code, value)
               await query(sql, params)
               updated++
+              if (registryName) {
+                await recordMappingChange({
+                  registry: reg, category, code, field: 'std_code2',
+                  oldValue, newValue: value === '' ? null : value, actor,
+                })
+              }
             } else if (m.target.kind === 'extra') {
               const { index } = m.target
               if (!c.extraFields || index >= c.extraFields.length) continue
+              const fieldKey = `std_code_e${index}` as `std_code_e${number}`
+              let oldValue: string | null = null
+              if (registryName) {
+                try {
+                  const { sql: selSql } = buildSelectCurrentSql(c, fieldKey)
+                  const { rows: selRows } = await query(selSql, [code])
+                  oldValue = (selRows[0]?.current_val as string | null | undefined) ?? null
+                } catch { /* best-effort */ }
+              }
               const { sql, params } = buildUpdateSqlExtra(c, index, code, value)
               await query(sql, params)
               updated++
+              if (registryName) {
+                await recordMappingChange({
+                  registry: reg, category, code, field: fieldKey,
+                  oldValue, newValue: value === '' ? null : value, actor,
+                })
+              }
             }
           } catch (err) {
             if (errors.length < MAX_ERRORS) {
@@ -257,6 +327,8 @@ export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
       const parsed = bodySchema.safeParse(req.body)
       if (!parsed.success) throw new AppError(400, 'INVALID_BODY', 'ต้องระบุ std_code หรือ std_code2')
       const code = String(req.params.code)
+      const actor = req.header('x-actor') || 'unknown'
+      const reg = registryName ?? 'basic'
 
       // extra path: N-field extra column update
       if (parsed.data.extra !== undefined) {
@@ -266,8 +338,29 @@ export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
         }
         const exists = await query(buildExistsSql(c), [code])
         if (exists.rowCount === 0) throw new AppError(404, 'NOT_FOUND', `ไม่พบรหัส: ${code}`)
+
+        // Read current value for audit
+        let oldValue: string | null = null
+        if (registryName) {
+          const fieldKey = `std_code_e${index}` as `std_code_e${number}`
+          try {
+            const { sql: selSql } = buildSelectCurrentSql(c, fieldKey)
+            const { rows: selRows } = await query(selSql, [code])
+            oldValue = (selRows[0]?.current_val as string | null | undefined) ?? null
+          } catch { /* best-effort */ }
+        }
+
         const { sql, params } = buildUpdateSqlExtra(c, index, code, value)
         await query(sql, params)
+
+        if (registryName) {
+          await recordMappingChange({
+            registry: reg, category, code,
+            field: `std_code_e${index}`,
+            oldValue, newValue: value === '' ? null : value, actor,
+          })
+        }
+
         res.json({ ok: true })
         return
       }
@@ -277,8 +370,26 @@ export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
         if (!c.mapCol2) throw new AppError(400, 'NOT_DUAL', `หมวด ${category} ไม่รองรับ std_code2`)
         const exists = await query(buildExistsSql(c), [code])
         if (exists.rowCount === 0) throw new AppError(404, 'NOT_FOUND', `ไม่พบรหัส: ${code}`)
+
+        let oldValue: string | null = null
+        if (registryName) {
+          try {
+            const { sql: selSql } = buildSelectCurrentSql(c, 'std_code2')
+            const { rows: selRows } = await query(selSql, [code])
+            oldValue = (selRows[0]?.current_val as string | null | undefined) ?? null
+          } catch { /* best-effort */ }
+        }
+
         const { sql, params } = buildUpdateSql2(c, code, parsed.data.std_code2)
         await query(sql, params)
+
+        if (registryName) {
+          await recordMappingChange({
+            registry: reg, category, code, field: 'std_code2',
+            oldValue, newValue: parsed.data.std_code2 === '' ? null : parsed.data.std_code2, actor,
+          })
+        }
+
         res.json({ ok: true })
         return
       }
@@ -286,8 +397,26 @@ export function makeConfigRouter({ get, list }: ConfigRegistryFns): Router {
       // std_code path: primary field update (existing behaviour)
       const exists = await query(buildExistsSql(c), [code])
       if (exists.rowCount === 0) throw new AppError(404, 'NOT_FOUND', `ไม่พบรหัส: ${code}`)
+
+      let oldValue: string | null = null
+      if (registryName) {
+        try {
+          const { sql: selSql } = buildSelectCurrentSql(c, 'std_code')
+          const { rows: selRows } = await query(selSql, [code])
+          oldValue = (selRows[0]?.current_val as string | null | undefined) ?? null
+        } catch { /* best-effort */ }
+      }
+
       const { sql, params } = buildUpdateSql(c, code, parsed.data.std_code!)
       await query(sql, params)
+
+      if (registryName) {
+        await recordMappingChange({
+          registry: reg, category, code, field: 'std_code',
+          oldValue, newValue: parsed.data.std_code === '' ? null : parsed.data.std_code!, actor,
+        })
+      }
+
       res.json({ ok: true })
     } catch (err) { next(err) }
   })

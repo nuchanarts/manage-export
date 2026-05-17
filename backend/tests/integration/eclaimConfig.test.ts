@@ -70,14 +70,17 @@ describe('eclaim-config routes', () => {
   it('PUT valid eclaim category (mock existence + update) → {ok:true}', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [{ icode: '3000003' }], rowCount: 1 }) // existence check
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                      // update
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 }) // select-current (audit)
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // update
+      .mockResolvedValue({ rows: [], rowCount: 0 })                           // ensure + audit INSERT
     const res = await request(app)
       .put('/api/eclaim-config/eclaim-charge/3000003')
       .send({ std_code: '72999' })
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ ok: true })
     // Verify the UPDATE targets the correct table and column
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[0]).toContain('UPDATE `nondrugitems` SET `nhso_adp_code` = ?')
     expect(updateCall[1]).toEqual(['72999', '3000003'])
   })
@@ -121,14 +124,17 @@ describe('eclaim-config routes', () => {
 
   it('PUT /api/eclaim-config/eclaim-charge/:code with {extra:{index:0,value:"X"}} updates correct column', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ icode: 'I001' }], rowCount: 1 })  // existence check
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                     // update
+      .mockResolvedValueOnce({ rows: [{ icode: 'I001' }], rowCount: 1 })   // existence check
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 }) // select-current (audit)
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // update
+      .mockResolvedValue({ rows: [], rowCount: 0 })                           // ensure + audit INSERT
     const res = await request(app)
       .put('/api/eclaim-config/eclaim-charge/I001')
       .send({ extra: { index: 0, value: 'X' } })
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ ok: true })
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     // index 0 = first extraField; primary mapCol is nhso_adp_code (keep it for std_code)
     // Extra fields: billcode(0), nhso_adp_type_id(1), sks_coverage_price(2), enable_sks_opd(3), enable_sks_ipd(4), sks_claim_category_type_id(5)
     expect(updateCall[0]).toContain('UPDATE `nondrugitems` SET')
@@ -140,12 +146,15 @@ describe('eclaim-config routes', () => {
   it('PUT /api/eclaim-config/eclaim-charge/:code with {extra:{index:0,value:""}} stores null', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [{ icode: 'I001' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ current_val: 'OLD' }], rowCount: 1 }) // select-current
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValue({ rows: [], rowCount: 0 })                            // ensure + audit INSERT
     const res = await request(app)
       .put('/api/eclaim-config/eclaim-charge/I001')
       .send({ extra: { index: 0, value: '' } })
     expect(res.status).toBe(200)
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[2] is the UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[1][0]).toBeNull()
   })
 
@@ -194,14 +203,17 @@ describe('eclaim-config routes', () => {
 
   it('PUT /api/eclaim-config/eclaim-clinic/:code with {std_code2} updates oapp_activity_id', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 }) // existence check
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                     // update
+      .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 })   // existence check
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 }) // select-current (audit)
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // update
+      .mockResolvedValue({ rows: [], rowCount: 0 })                           // ensure + audit INSERT
     const res = await request(app)
       .put('/api/eclaim-config/eclaim-clinic/CLI01')
       .send({ std_code2: 'ACT42' })
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ ok: true })
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[0]).toContain('UPDATE `clinic` SET `oapp_activity_id` = ?')
     expect(updateCall[1]).toEqual(['ACT42', 'CLI01'])
   })
@@ -209,12 +221,15 @@ describe('eclaim-config routes', () => {
   it('PUT /api/eclaim-config/eclaim-clinic/:code with {std_code2:""} clears to null', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ current_val: 'OLD' }], rowCount: 1 }) // select-current
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValue({ rows: [], rowCount: 0 })                            // ensure + audit INSERT
     const res = await request(app)
       .put('/api/eclaim-config/eclaim-clinic/CLI01')
       .send({ std_code2: '' })
     expect(res.status).toBe(200)
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[2] is the UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[0]).toContain('UPDATE `clinic` SET `oapp_activity_id` = ?')
     expect(updateCall[1][0]).toBeNull()
     expect(updateCall[1][1]).toBe('CLI01')
@@ -225,14 +240,17 @@ describe('eclaim-config routes', () => {
   it('PUT /api/eclaim-config/eclaim-drug-ned/:code with free-text std_code updates claim_control', async () => {
     const doctorReason = encodeURIComponent('ไม่มียาในบัญชียา')
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ไม่มียาในบัญชียา' }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ไม่มียาในบัญชียา' }], rowCount: 1 }) // exists
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 })                   // select-current
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                                         // update
+      .mockResolvedValue({ rows: [], rowCount: 0 })                                             // ensure + audit INSERT
     const res = await request(app)
       .put(`/api/eclaim-config/eclaim-drug-ned/${doctorReason}`)
       .send({ std_code: 'EZ' })
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ ok: true })
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[0]).toContain('UPDATE `drugitems_ned_reason_list` SET `claim_control` = ?')
     expect(updateCall[1]).toEqual(['EZ', 'ไม่มียาในบัญชียา'])
   })

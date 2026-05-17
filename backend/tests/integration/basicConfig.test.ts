@@ -29,12 +29,15 @@ describe('basic-config routes', () => {
 
   it('PUT updates the mapping and returns ok', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ code: '05' }], rowCount: 1 }) // existence check
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })               // update
+      .mockResolvedValueOnce({ rows: [{ code: '05' }], rowCount: 1 })         // existence check
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 })   // select-current (audit)
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                         // update
+      .mockResolvedValue({ rows: [], rowCount: 0 })                             // ensure + audit INSERT (best-effort)
     const res = await request(app).put('/api/basic-config/occupation/05').send({ std_code: '0510' })
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ ok: true })
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[0]).toContain('UPDATE `occupation` SET `nhso_code` = ?')
     expect(updateCall[1]).toEqual(['0510', '05'])
   })
@@ -76,14 +79,17 @@ describe('basic-config routes', () => {
 
   it('PUT /api/basic-config/clinic/:code with {std_code2} updates oapp_activity_id', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 }) // existence check
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                     // update
+      .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 })   // existence check
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 }) // select-current (audit)
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // update
+      .mockResolvedValue({ rows: [], rowCount: 0 })                           // ensure + audit INSERT
     const res = await request(app)
       .put('/api/basic-config/clinic/CLI01')
       .send({ std_code2: 'ACT99' })
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ ok: true })
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[0]).toContain('UPDATE `clinic` SET `oapp_activity_id` = ?')
     expect(updateCall[1]).toEqual(['ACT99', 'CLI01'])
   })
@@ -109,14 +115,17 @@ describe('basic-config routes', () => {
   it('PUT /api/basic-config/drug-ned-reason/:code with free-text std_code updates claim_control', async () => {
     const doctorReason = encodeURIComponent('ไม่มียาในบัญชียา')
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ไม่มียาในบัญชียา' }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ไม่มียาในบัญชียา' }], rowCount: 1 }) // exists
+      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 })                   // select-current
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                                         // update
+      .mockResolvedValue({ rows: [], rowCount: 0 })                                             // ensure + audit INSERT
     const res = await request(app)
       .put(`/api/basic-config/drug-ned-reason/${doctorReason}`)
       .send({ std_code: 'EZ' })
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ ok: true })
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[0]).toContain('UPDATE `drugitems_ned_reason_list` SET `claim_control` = ?')
     expect(updateCall[1]).toEqual(['EZ', 'ไม่มียาในบัญชียา'])
   })
@@ -124,13 +133,16 @@ describe('basic-config routes', () => {
   it('PUT /api/basic-config/drug-ned-reason/:code with std_code="" clears to null', async () => {
     const doctorReason = encodeURIComponent('ยาราคาแพง')
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ยาราคาแพง' }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ยาราคาแพง' }], rowCount: 1 }) // exists
+      .mockResolvedValueOnce({ rows: [{ current_val: 'OLD' }], rowCount: 1 })          // select-current
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                                 // update
+      .mockResolvedValue({ rows: [], rowCount: 0 })                                     // ensure + audit INSERT
     const res = await request(app)
       .put(`/api/basic-config/drug-ned-reason/${doctorReason}`)
       .send({ std_code: '' })
     expect(res.status).toBe(200)
-    const updateCall = mockQuery.mock.calls[1]
+    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
+    const updateCall = mockQuery.mock.calls[2]
     expect(updateCall[0]).toContain('UPDATE `drugitems_ned_reason_list` SET `claim_control` = ?')
     expect(updateCall[1][0]).toBeNull()
     expect(updateCall[1][1]).toBe('ยาราคาแพง')

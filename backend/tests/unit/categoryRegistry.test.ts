@@ -1,5 +1,5 @@
 import { getCategory, listCategories, CATEGORY_REGISTRY } from '../../src/services/categoryRegistry'
-import { buildListSql, buildStdOptionsSql, buildUpdateSql, buildStdOptionsSql2, buildUpdateSql2, buildStdOptionsSqlExtra, buildUpdateSqlExtra } from '../../src/services/categoryRegistry'
+import { buildListSql, buildStdOptionsSql, buildUpdateSql, buildStdOptionsSql2, buildUpdateSql2, buildStdOptionsSqlExtra, buildUpdateSqlExtra, buildSelectCurrentSql } from '../../src/services/categoryRegistry'
 import type { CategoryDef } from '../../src/services/categoryRegistry'
 
 describe('category registry', () => {
@@ -395,5 +395,73 @@ describe('hideCodeCol flag', () => {
     const withHide = CATEGORY_REGISTRY.filter(c => c.hideCodeCol)
     expect(withHide.length).toBe(1)
     expect(withHide[0]!.key).toBe('drug-ned-reason')
+  })
+})
+
+// ─── buildSelectCurrentSql ────────────────────────────────────────────────────
+describe('buildSelectCurrentSql', () => {
+  const occ = getCategory('occupation')!
+  const clinic = getCategory('clinic')!
+
+  const catExtra: CategoryDef = {
+    key: 'test-select-extra',
+    label: 'Test',
+    table: 'nondrugitems',
+    pk: 'icode',
+    nameCol: 'name',
+    mapCol: 'nhso_adp_code',
+    stdTable: 'nhso_adp_code',
+    stdCodeCol: 'nhso_adp_code',
+    stdNameCol: 'nhso_adp_code_name',
+    pending: false,
+    extraFields: [
+      { mapCol: 'billcode', label: 'Bill code' },
+      { mapCol: 'nhso_adp_type_id', label: 'ADP type' },
+    ],
+  }
+
+  it('builds a parameterized SELECT for std_code (primary)', () => {
+    const { sql, col } = buildSelectCurrentSql(occ, 'std_code')
+    expect(col).toBe('nhso_code')
+    expect(sql).toBe(
+      'SELECT `nhso_code` AS current_val FROM `occupation` WHERE `occupation` = ? LIMIT 1'
+    )
+    // Values are parameterized (no literals)
+    expect(sql).toContain('?')
+  })
+
+  it('builds a parameterized SELECT for std_code2 (secondary) on a dual category', () => {
+    const { sql, col } = buildSelectCurrentSql(clinic, 'std_code2')
+    expect(col).toBe('oapp_activity_id')
+    expect(sql).toContain('`oapp_activity_id` AS current_val')
+    expect(sql).toContain('FROM `clinic`')
+    expect(sql).toContain('? LIMIT 1')
+  })
+
+  it('builds a parameterized SELECT for std_code_e0 (first extra field)', () => {
+    const { sql, col } = buildSelectCurrentSql(catExtra, 'std_code_e0')
+    expect(col).toBe('billcode')
+    expect(sql).toContain('`billcode` AS current_val')
+    expect(sql).toContain('FROM `nondrugitems`')
+  })
+
+  it('builds a parameterized SELECT for std_code_e1 (second extra field)', () => {
+    const { sql, col } = buildSelectCurrentSql(catExtra, 'std_code_e1')
+    expect(col).toBe('nhso_adp_type_id')
+    expect(sql).toContain('`nhso_adp_type_id` AS current_val')
+  })
+
+  it('throws for std_code2 on a non-dual category', () => {
+    expect(() => buildSelectCurrentSql(occ, 'std_code2')).toThrow(/mapCol2/)
+  })
+
+  it('throws for out-of-range extra index', () => {
+    expect(() => buildSelectCurrentSql(catExtra, 'std_code_e99')).toThrow(/extraFields/)
+  })
+
+  it('all identifiers in the generated SQL pass through ident() allow-list (backtick-quoted)', () => {
+    const { sql } = buildSelectCurrentSql(occ, 'std_code')
+    // ident() always wraps in backticks — no raw unquoted table/col names
+    expect(sql).toMatch(/SELECT `[A-Za-z0-9_]+` AS current_val FROM `[A-Za-z0-9_]+` WHERE `[A-Za-z0-9_]+` = \? LIMIT 1/)
   })
 })
