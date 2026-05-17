@@ -15,7 +15,7 @@ import { onNavigate } from './data/appNav'
 import { LoginPage } from './pages/LoginPage'
 import { getAuth, clearAuth, initAxiosAuth } from './data/auth'
 
-type MenuKey = 'dashboard' | 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge' | 'global-search' | 'snapshots'
+type MenuKey = 'dashboard' | 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge' | 'global-search' | 'snapshots' | 'chi-link'
 
 interface NavItem {
   key: MenuKey
@@ -24,6 +24,7 @@ interface NavItem {
   sublabel?: string
   ready: boolean
   children?: NavItem[]
+  href?: string   // if set, the item is an external link (opens in a new tab)
 }
 
 const NAV: NavItem[] = [
@@ -119,6 +120,14 @@ const NAV: NavItem[] = [
         sublabel: 'ถาม-ตอบ 43 แฟ้ม',
         ready: true,
       },
+      {
+        key: 'chi-link',
+        icon: '🔗',
+        label: 'ลิงก์บริการ สกส.',
+        sublabel: 'CHI (chi.or.th)',
+        ready: true,
+        href: 'https://www.chi.or.th/',
+      },
     ],
   },
 ]
@@ -164,13 +173,8 @@ function SidebarItem({
   }
 
   const isActive = item.key === activeMenu && item.ready
-  return (
-    <button
-      onClick={() => item.ready && setActiveMenu(item.key)}
-      className={`w-full text-left px-3 py-2 flex items-start gap-2 rounded-md mx-1 my-0.5 transition-colors ${
-        item.ready ? 'hover:bg-blue-50 cursor-pointer' : 'opacity-40 cursor-not-allowed'
-      } ${isActive ? 'bg-blue-50 border-l-[3px] border-blue-600' : 'border-l-[3px] border-transparent'}`}
-    >
+  const innerContent = (
+    <>
       <span className="text-sm shrink-0 mt-0.5">{item.icon}</span>
       <div className="min-w-0">
         <p className={`text-sm leading-snug ${isActive ? 'font-semibold text-blue-800' : 'font-medium text-gray-700'}`}>
@@ -181,6 +185,31 @@ function SidebarItem({
           <span className="inline-block mt-1 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">เร็วๆ นี้</span>
         )}
       </div>
+    </>
+  )
+
+  if (item.href) {
+    return (
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full text-left px-3 py-2 flex items-start gap-2 rounded-md mx-1 my-0.5 transition-colors hover:bg-blue-50 cursor-pointer border-l-[3px] border-transparent"
+      >
+        {innerContent}
+        <span aria-hidden="true" className="text-[10px] text-gray-400 ml-auto mt-0.5">↗</span>
+      </a>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => item.ready && setActiveMenu(item.key)}
+      className={`w-full text-left px-3 py-2 flex items-start gap-2 rounded-md mx-1 my-0.5 transition-colors ${
+        item.ready ? 'hover:bg-blue-50 cursor-pointer' : 'opacity-40 cursor-not-allowed'
+      } ${isActive ? 'bg-blue-50 border-l-[3px] border-blue-600' : 'border-l-[3px] border-transparent'}`}
+    >
+      {innerContent}
     </button>
   )
 }
