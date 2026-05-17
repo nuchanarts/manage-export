@@ -36,6 +36,7 @@ export const NHSO_LINKS: NhsoLink[] = [
   { category: 'ตรวจสอบและคุณภาพ', revenue: REVENUE, name: 'ระบบอุทธรณ์สำหรับหน่วยบริการ (OSR)', url: 'https://audit.nhso.go.th/osrappeal/frontend/#/auth/login' },
   { category: 'ตรวจสอบและคุณภาพ', revenue: REVENUE, name: 'ระบบประเมินคุณภาพเวชระเบียน (MRA)', url: 'https://mra.nhso.go.th/MRA/' },
   { category: 'ตรวจสอบและคุณภาพ', revenue: REVENUE, name: 'ระบบตรวจสอบเวชระเบียนอิเล็กทรอนิกส์ (eMA)', url: 'https://audit.nhso.go.th/ema/' },
+  { category: 'ตรวจสอบและคุณภาพ', revenue: REVENUE, name: 'ลิงก์บริการ สกส. (CHI)', url: 'https://www.chi.or.th/' },
 
   // --- บริหารงบประมาณ (revenue) ---
   { category: 'บริหารงบประมาณ', revenue: REVENUE, name: 'รายงานการจ่ายเงินกองทุน (2566-ปัจจุบัน)', url: 'https://smt.nhso.go.th/smtf/#/bs/' },

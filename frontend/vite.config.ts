@@ -12,4 +12,14 @@ export default defineConfig({
       },
     },
   },
+  // Stable production preview (no HMR) — proxies /api to the backend too.
+  preview: {
+    port: 6100,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:6000',
+        changeOrigin: true,
+      },
+    },
+  },
 })
