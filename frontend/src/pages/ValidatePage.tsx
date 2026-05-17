@@ -3,75 +3,15 @@ import axios from 'axios'
 import { LoadingSpinner } from '../components/shared/LoadingSpinner'
 import { requestNavigate } from '../data/appNav'
 import { mapValidationToCategory } from '../data/validationLink'
-
-interface FieldError {
-  row: number
-  field: string
-  caption: string
-  description: string
-  type: string
-  value?: string
-  message: string
-  pid?: string
-  cid?: string
-}
-
-interface PersonError {
-  pid: string
-  cid: string
-  hn: string
-  name: string
-  errors: { field: string; caption: string; type: string; value?: string }[]
-}
-
-interface SchemaFieldSummary {
-  name: string
-  caption: string
-  type: string
-  width: number
-  notNull: boolean
-  pk: boolean
-}
-
-interface FileResult {
-  fileName: string
-  description: string
-  status: 'PASS' | 'FAIL' | 'WARN' | 'UNKNOWN'
-  totalRows: number
-  totalPersons: number
-  passPersons: number
-  failPersons: number
-  passPercent: number
-  errorCount: number
-  warnCount: number
-  errors: FieldError[]
-  personErrors: PersonError[]
-  personPass: PersonError[]
-  missingColumns: string[]
-  extraColumns: string[]
-  schemaFields: SchemaFieldSummary[]
-  fileMeta: FileMetaFull
-}
-
-interface HisGuide {
-  menu: string
-  path: string[]
-  screen: string
-  note?: string
-  keyFields: string[]
-}
-
-interface FileMetaFull {
-  fileNumber: number
-  fileType: string
-  units: string
-  definition: string
-  scope: string[]
-  period: string[]
-  notes: string[]
-  related: string[]
-  hisGuide: HisGuide | null
-}
+import {
+  type FieldError,
+  type SchemaFieldSummary,
+  type FileResult,
+  type FileMetaFull,
+  type ValidationReport,
+  getValidateSession,
+  setValidateSession,
+} from '../data/validateStore'
 
 function SchemaTooltip({ fields, fileName, description, fileMeta }: {
   fields: SchemaFieldSummary[]
@@ -194,32 +134,6 @@ function SchemaTooltip({ fields, fileName, description, fileMeta }: {
       )}
     </span>
   )
-}
-
-interface ErrorGroupSummary {
-  fileName: string
-  description: string
-  totalPersons: number
-  failPersons: number
-  passPercent: number
-  topErrors: { field: string; caption: string; count: number }[]
-}
-
-interface ValidationReport {
-  hospcode: string
-  totalFiles: number
-  passCount: number
-  failCount: number
-  warnCount: number
-  totalPersonsAll: number
-  passPersonsAll: number
-  failPersonsAll: number
-  passPercentAll: number
-  errorGroupSummary: ErrorGroupSummary[]
-  missingFiles: string[]
-  unknownFiles: string[]
-  files: FileResult[]
-  generatedAt: string
 }
 
 function fileTypeBadge(t: string): string {
@@ -682,22 +596,25 @@ export function ValidatePage() {
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [report, setReport] = useState<ValidationReport | null>(null)
+  const [report, setReport] = useState<ValidationReport | null>(() => getValidateSession().report)
   const [selectedFile, setSelectedFile] = useState<FileResult | null>(null)
-  const [fileName, setFileName] = useState<string | null>(null)
+  const [fileName, setFileName] = useState<string | null>(() => getValidateSession().fileName)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const folderRef = useRef<HTMLInputElement>(null)
 
   const submitToServer = async (form: FormData, label: string) => {
     setError(null); setReport(null); setLoading(true); setFileName(label)
+    setValidateSession({ report: null, fileName: label })
     try {
       const { data } = await axios.post<ValidationReport>('/api/validate', form, {
         headers: { 'Content-Type': 'multipart/form-data' }, timeout: 180_000,
       })
       setReport(data)
+      setValidateSession({ report: data, fileName: label })
     } catch (err: unknown) {
       setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'เกิดข้อผิดพลาดในการตรวจสอบ')
+      setValidateSession({ report: null, fileName: label })
     } finally { setLoading(false) }
   }
 
