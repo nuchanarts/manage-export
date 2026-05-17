@@ -6,6 +6,7 @@ import { NhsoLinksPage } from './pages/NhsoLinksPage'
 import { HelpPage } from './pages/HelpPage'
 import { KnowledgePage } from './pages/KnowledgePage'
 import { THEMES, getStoredTheme, storeTheme } from './theme/theme'
+import { getOrCreateClientId } from './utils/clientId'
 
 type MenuKey = 'validate' | 'basic-config' | 'eclaim-config' | 'nhso-links' | 'help' | 'knowledge'
 
@@ -156,10 +157,44 @@ export function App() {
   const isResizing = useRef(false)
 
   const [theme, setTheme] = useState<string>(() => getStoredTheme(window.localStorage))
+  const [online, setOnline] = useState<number>(1)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  // Presence heartbeat — ping every 20 s and refresh count on the same cadence.
+  // Network errors are swallowed so a backend restart never crashes the UI.
+  useEffect(() => {
+    const clientId = getOrCreateClientId(window.localStorage)
+
+    async function pingAndCount() {
+      try {
+        await fetch('/api/presence/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: clientId }),
+        })
+      } catch {
+        // swallow — server may be temporarily unavailable
+      }
+      try {
+        const res = await fetch('/api/presence/count')
+        if (res.ok) {
+          const data = await res.json() as { count: number }
+          setOnline(data.count)
+        }
+      } catch {
+        // swallow
+      }
+    }
+
+    // Fire immediately on mount
+    void pingAndCount()
+
+    const handle = setInterval(() => { void pingAndCount() }, 20_000)
+    return () => clearInterval(handle)
+  }, [])
 
   function handleThemeChange(id: string) {
     setTheme(id)
@@ -205,6 +240,14 @@ export function App() {
             <h1 className="text-lg font-bold leading-tight">ระบบตรวจสอบการส่งออกข้อมูลมาตรฐาน</h1>
             <p className="text-white/70 text-xs">{currentLabel}</p>
           </div>
+          {/* Online user count pill */}
+          <span
+            className="bg-white/15 text-white text-xs rounded px-2 py-1 shrink-0"
+            title="ผู้ใช้งานออนไลน์ขณะนี้"
+          >
+            🟢 {online} ออนไลน์
+          </span>
+
           {/* Theme switcher */}
           <select
             value={theme}

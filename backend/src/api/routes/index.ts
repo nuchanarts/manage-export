@@ -3,6 +3,7 @@ import recordsRouter from './records'
 import validateRouter from './validate'
 import basicConfigRouter from './basicConfig'
 import eclaimConfigRouter from './eclaimConfig'
+import presenceRouter from './presence'
 
 const router = Router()
 
@@ -14,5 +15,6 @@ router.use('/records', recordsRouter)
 router.use('/validate', validateRouter)
 router.use('/basic-config', basicConfigRouter)
 router.use('/eclaim-config', eclaimConfigRouter)
+router.use('/presence', presenceRouter)
 
 export default router
