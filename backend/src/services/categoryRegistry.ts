@@ -63,10 +63,10 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     table: 'house_regist_type', pk: 'house_regist_type_id', nameCol: 'house_regist_type_name', mapCol: 'export_code',
     stdTable: 'provis_typearea', stdCodeCol: 'code', stdNameCol: 'name',
     pending: false },
-  // er_oper_code(er_oper_code PK, name, icd9cm) -> provis_icd10tm_oper(icd9cm_code, name)  [JOIN verified 2026-05-17; icd9cm separate from pk]
+  // er_oper_code(er_oper_code PK, name, icd9cm) -> icd9cm1(code, name)  [owner-specified 2026-05-17; mapCol icd9cm distinct from pk; tables/cols probe-verified]
   { key: 'procedure', label: 'หัตถการ',
     table: 'er_oper_code', pk: 'er_oper_code', nameCol: 'name', mapCol: 'icd9cm',
-    stdTable: 'provis_icd10tm_oper', stdCodeCol: 'icd9cm_code', stdNameCol: 'name',
+    stdTable: 'icd9cm1', stdCodeCol: 'code', stdNameCol: 'name',
     pending: false },
   // women_birth_control(women_birth_control_id PK, women_birth_control_name, export_code) -> provis_fptype(code, name)  [JOIN verified 2026-05-17]
   { key: 'fp-method', label: 'การคุมกำเนิด',
