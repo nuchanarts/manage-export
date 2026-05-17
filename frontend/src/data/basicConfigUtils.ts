@@ -52,3 +52,21 @@ export function autoMatchSuggestions(
   }
   return out
 }
+
+export type SortKey = 'code' | 'name' | 'std_code' | 'std_code2'
+export type SortDir = 'asc' | 'desc'
+
+// Returns a NEW array sorted by the given field. Thai/locale-aware string
+// compare; null/undefined/'' always sort to the end regardless of dir.
+export function sortRows(rows: BasicRow[], key: SortKey, dir: SortDir): BasicRow[] {
+  const factor = dir === 'asc' ? 1 : -1
+  return [...rows].sort((a, b) => {
+    const av = (a[key] ?? '') as string
+    const bv = (b[key] ?? '') as string
+    const ae = av === '', be = bv === ''
+    if (ae && be) return 0
+    if (ae) return 1            // empties last
+    if (be) return -1
+    return av.localeCompare(bv, 'th', { numeric: true, sensitivity: 'base' }) * factor
+  })
+}

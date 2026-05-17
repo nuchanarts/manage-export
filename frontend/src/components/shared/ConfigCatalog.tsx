@@ -6,8 +6,11 @@ import {
   summarize,
   filterOptions,
   autoMatchSuggestions,
+  sortRows,
   BasicRow,
   StdOption,
+  SortKey,
+  SortDir,
 } from '../../data/basicConfigUtils'
 
 // ─── Menu item type (additive: dual + optional labels) ────────────────────────
@@ -197,6 +200,21 @@ function DataTable({
   // ── Filter toggle state ──
   const [showUnmappedOnly, setShowUnmappedOnly] = useState(false)
 
+  // ── Sort state ──
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null)
+
+  function handleSortClick(key: SortKey) {
+    setSort(prev => {
+      if (prev === null || prev.key !== key) return { key, dir: 'asc' }
+      return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+    })
+  }
+
+  function sortIndicator(key: SortKey): string {
+    if (sort === null || sort.key !== key) return ' ⇅'
+    return sort.dir === 'asc' ? ' ▲' : ' ▼'
+  }
+
   // ── Auto-match state ──
   const [matching, setMatching] = useState(false)
   const [autoMatchMsg, setAutoMatchMsg] = useState<string | null>(null)
@@ -207,8 +225,9 @@ function DataTable({
   // Summary always over full rows (not filtered)
   const s = summarize(rows)
 
-  // Displayed rows respect the filter toggle
-  const displayedRows = showUnmappedOnly ? rows.filter(isUnmapped) : rows
+  // Displayed rows respect the filter toggle, then optionally sorted
+  const filteredRows = showUnmappedOnly ? rows.filter(isUnmapped) : rows
+  const displayedRows = sort ? sortRows(filteredRows, sort.key, sort.dir) : filteredRows
 
   async function handleAutoMatch() {
     setAutoMatchMsg(null)
@@ -276,14 +295,32 @@ function DataTable({
         <table className="min-w-full text-sm">
           <thead className="bg-blue-700 text-white">
             <tr>
-              <th className="text-left px-3 py-2 font-medium w-20">รหัส</th>
-              <th className="text-left px-3 py-2 font-medium w-56">ชื่อ (HIS)</th>
-              <th className="text-left px-3 py-2 font-medium">
+              <th
+                className="text-left px-3 py-2 font-medium w-20 cursor-pointer select-none"
+                onClick={() => handleSortClick('code')}
+              >
+                รหัส<span className="text-xs opacity-70">{sortIndicator('code')}</span>
+              </th>
+              <th
+                className="text-left px-3 py-2 font-medium w-56 cursor-pointer select-none"
+                onClick={() => handleSortClick('name')}
+              >
+                ชื่อ (HIS)<span className="text-xs opacity-70">{sortIndicator('name')}</span>
+              </th>
+              <th
+                className="text-left px-3 py-2 font-medium cursor-pointer select-none"
+                onClick={() => handleSortClick('std_code')}
+              >
                 {isDual ? (menu.field1Label ?? 'รหัสมาตรฐาน 1') : 'รหัสมาตรฐาน'}
+                <span className="text-xs opacity-70">{sortIndicator('std_code')}</span>
               </th>
               {isDual && (
-                <th className="text-left px-3 py-2 font-medium">
+                <th
+                  className="text-left px-3 py-2 font-medium cursor-pointer select-none"
+                  onClick={() => handleSortClick('std_code2')}
+                >
                   {menu.field2Label ?? 'รหัสมาตรฐาน 2'}
+                  <span className="text-xs opacity-70">{sortIndicator('std_code2')}</span>
                 </th>
               )}
             </tr>
