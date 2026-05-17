@@ -7,3 +7,51 @@
     @apply bg-gray-50 text-gray-900 font-sans;
   }
 }
+
+/* ── Theme CSS variables ─────────────────────────────────────────── */
+:root,
+:root[data-theme="blue"] {
+  --app-header: #1e40af;
+  --app-primary: #1d4ed8;
+  --app-primary-hover: #1e40af;
+  --app-accent: #2563eb;
+  --app-accent-soft: #eff6ff;
+}
+:root[data-theme="teal"] {
+  --app-header: #0f766e;
+  --app-primary: #0d9488;
+  --app-primary-hover: #0f766e;
+  --app-accent: #0d9488;
+  --app-accent-soft: #f0fdfa;
+}
+:root[data-theme="indigo"] {
+  --app-header: #3730a3;
+  --app-primary: #4338ca;
+  --app-primary-hover: #3730a3;
+  --app-accent: #4f46e5;
+  --app-accent-soft: #eef2ff;
+}
+:root[data-theme="slate"] {
+  --app-header: #1e293b;
+  --app-primary: #334155;
+  --app-primary-hover: #1e293b;
+  --app-accent: #475569;
+  --app-accent-soft: #f1f5f9;
+}
+
+/* ── Utility classes driven by CSS variables ─────────────────────── */
+.app-header {
+  background-color: var(--app-header);
+}
+.app-primary-btn {
+  background-color: var(--app-primary);
+}
+.app-primary-btn:hover {
+  background-color: var(--app-primary-hover);
+}
+.app-accent-text {
+  color: var(--app-accent);
+}
+.app-accent-bg {
+  background-color: var(--app-accent-soft);
+}

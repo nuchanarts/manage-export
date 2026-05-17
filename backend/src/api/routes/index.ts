@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express'
 import recordsRouter from './records'
 import validateRouter from './validate'
+import basicConfigRouter from './basicConfig'
+import eclaimConfigRouter from './eclaimConfig'
 
 const router = Router()
 
@@ -10,5 +12,7 @@ router.get('/health', (_req: Request, res: Response) => {
 
 router.use('/records', recordsRouter)
 router.use('/validate', validateRouter)
+router.use('/basic-config', basicConfigRouter)
+router.use('/eclaim-config', eclaimConfigRouter)
 
 export default router

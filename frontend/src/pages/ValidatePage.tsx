@@ -257,14 +257,23 @@ const ERR_TYPE_LABEL: Record<string, string> = {
 }
 
 function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospcode: string; onClose: () => void }) {
-  const [tab, setTab] = useState<'fail' | 'pass' | 'field'>('fail')
+  const [tab, setTab] = useState<'incomplete' | 'fail' | 'pass' | 'field'>(file.status === 'PASS' ? 'pass' : 'incomplete')
   const [exporting, setExporting] = useState(false)
 
   const handleExportExcel = async () => {
     setExporting(true)
     try {
-      // Export all persons (fail + pass) based on current tab
-      const persons = tab === 'pass' ? file.personPass : file.personErrors
+      let persons = file.personErrors
+      let exportType: 'pass' | 'fail' = 'fail'
+      let suffix = 'fail'
+
+      if (tab === 'pass') {
+        persons = file.personPass; exportType = 'pass'; suffix = 'pass'
+      } else if (tab === 'incomplete') {
+        persons = file.personErrors.filter(p => p.errors.some(e => e.type === 'NULL_REQUIRED'))
+        suffix = 'incomplete'
+      }
+
       const resp = await fetch('/api/validate/export-errors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -274,6 +283,7 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
           hospcode,
           personErrors: persons,
           missingColumns: file.missingColumns,
+          exportType,
         }),
       })
       const blob = await resp.blob()
@@ -281,7 +291,6 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
       const a = document.createElement('a')
       a.href = url
       const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-      const suffix = tab === 'pass' ? 'pass' : tab === 'fail' ? 'fail' : 'summary'
       a.download = `${suffix}-${file.fileName.replace('.txt', '')}-${date}.xlsx`
       document.body.appendChild(a); a.click(); document.body.removeChild(a)
       URL.revokeObjectURL(url)
@@ -351,7 +360,7 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
           </div>
           <div className="flex items-center gap-2 ml-4">
             <button onClick={handlePrint} className="px-3 py-1.5 bg-white text-blue-800 text-xs font-medium rounded hover:bg-blue-50 transition-colors">🖨 พิมพ์</button>
-            <button onClick={handleExportExcel} disabled={exporting || file.personErrors.length === 0}
+            <button onClick={handleExportExcel} disabled={exporting || (tab === 'pass' ? file.personPass.length === 0 : tab === 'incomplete' ? !file.personErrors.some(p => p.errors.some(e => e.type === 'NULL_REQUIRED')) : tab === 'fail' ? file.personErrors.length === 0 : false)}
               className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-medium rounded transition-colors">
               {exporting ? '...' : '⬇ Excel'}
             </button>
@@ -418,20 +427,84 @@ function FileDetailPanel({ file, hospcode, onClose }: { file: FileResult; hospco
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 px-5 pt-4">
-          {[
-            { key: 'fail', label: `❌ ไม่ผ่าน (${file.failPersons} คน)`, color: file.failPersons > 0 ? 'text-red-700 border-red-600' : '' },
-            { key: 'pass', label: `✅ ผ่าน (${file.passPersons} คน)`, color: 'text-green-700 border-green-600' },
-            { key: 'field', label: `📋 สรุปตามฟิลด์ (${Object.keys(byField).length})`, color: '' },
-          ].map(t => (
-            <button key={t.key} onClick={() => setTab(t.key as 'fail' | 'pass' | 'field')}
-              className={`px-4 py-1.5 text-sm rounded-t-lg border-b-2 font-medium transition-colors ${tab === t.key ? (t.color || 'text-blue-700 border-blue-700') : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {(() => {
+          const incompletePersons = file.personErrors.filter(p => p.errors.some(e => e.type === 'NULL_REQUIRED'))
+          const otherFailPersons = file.personErrors.filter(p => p.errors.some(e => e.type !== 'NULL_REQUIRED') && !p.errors.every(e => e.type === 'NULL_REQUIRED'))
+          return (
+            <div className="flex flex-wrap gap-1 px-5 pt-4">
+              {[
+                { key: 'incomplete', label: `📋 ข้อมูลไม่ครบ (${incompletePersons.length} คน)`, color: incompletePersons.length > 0 ? 'text-orange-700 border-orange-500' : '' },
+                { key: 'fail', label: `❌ ไม่ผ่านทั้งหมด (${file.failPersons} คน)`, color: file.failPersons > 0 ? 'text-red-700 border-red-600' : '' },
+                { key: 'pass', label: `✅ ผ่าน (${file.passPersons} คน)`, color: 'text-green-700 border-green-600' },
+                { key: 'field', label: `🔍 สรุปตามฟิลด์ (${Object.keys(byField).length})`, color: '' },
+              ].map(t => (
+                <button key={t.key} onClick={() => setTab(t.key as 'incomplete' | 'fail' | 'pass' | 'field')}
+                  className={`px-3 py-1.5 text-sm rounded-t-lg border-b-2 font-medium transition-colors ${tab === t.key ? (t.color || 'text-blue-700 border-blue-700') : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )
+        })()}
 
         <div className="px-5 pb-5 max-h-[60vh] overflow-y-auto border-t">
+
+          {/* Tab: ข้อมูลไม่ครบ */}
+          {tab === 'incomplete' && (() => {
+            const persons = file.personErrors.filter(p => p.errors.some(e => e.type === 'NULL_REQUIRED'))
+            return (
+              <div className="mt-3">
+                {persons.length === 0
+                  ? <p className="text-green-700 text-center py-6">✅ ทุก record มีข้อมูลครบถ้วน</p>
+                  : (
+                    <>
+                      <p className="text-xs text-orange-600 mb-2 px-1">
+                        ⚠️ แสดง record ที่มีฟิลด์บังคับ (NOT NULL) ว่างเปล่า — ต้องไปกรอกข้อมูลให้ครบใน HIS
+                      </p>
+                      <table className="min-w-full text-xs">
+                        <thead className="sticky top-0 bg-orange-500 text-white">
+                          <tr>
+                            <th className="text-left px-3 py-2">#</th>
+                            <th className="text-left px-3 py-2">PID</th>
+                            <th className="text-left px-3 py-2">HN</th>
+                            <th className="text-left px-3 py-2">ชื่อ-นามสกุล</th>
+                            <th className="text-left px-3 py-2">CID</th>
+                            <th className="text-left px-3 py-2">ฟิลด์ที่ว่าง (ต้องกรอก)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {persons.map((p, i) => {
+                            const emptyFields = p.errors.filter(e => e.type === 'NULL_REQUIRED')
+                            return (
+                              <tr key={p.pid} className={i % 2 === 0 ? 'bg-white' : 'bg-orange-50'}>
+                                <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
+                                <td className="px-3 py-1.5 font-mono text-gray-700">{p.pid}</td>
+                                <td className="px-3 py-1.5 font-mono text-blue-700">{p.hn || '–'}</td>
+                                <td className="px-3 py-1.5 font-semibold text-gray-800">{p.name || '–'}</td>
+                                <td className="px-3 py-1.5 font-mono text-gray-600">{p.cid || '–'}</td>
+                                <td className="px-3 py-1.5">
+                                  <div className="flex flex-wrap gap-1">
+                                    {emptyFields.map(e => (
+                                      <span key={e.field} title={e.caption} className="bg-orange-100 text-orange-800 border border-orange-300 px-1.5 py-0.5 rounded font-mono text-[11px]">
+                                        {e.field}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                      {persons.length >= 500 && (
+                        <p className="text-xs text-gray-400 text-center mt-2">แสดง 500 รายการแรก</p>
+                      )}
+                    </>
+                  )
+                }
+              </div>
+            )
+          })()}
 
           {/* Tab: ไม่ผ่าน */}
           {tab === 'fail' && (
@@ -639,6 +712,20 @@ export function ValidatePage() {
 
   return (
     <div className="space-y-5">
+      {/* Related external links */}
+      <div className="flex flex-wrap items-center gap-2 bg-white rounded-lg shadow px-4 py-2.5 text-sm">
+        <span className="text-gray-500">ลิงก์ที่เกี่ยวข้อง:</span>
+        <a
+          href="https://hdc.moph.go.th/center/public/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium transition-colors"
+        >
+          🌐 HDC กระทรวงสาธารณสุข (ตรวจสอบส่งออก 43 แฟ้ม)
+          <span aria-hidden="true" className="text-xs">↗</span>
+        </a>
+      </div>
+
       {/* Upload Zone */}
       <div
         onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -768,8 +855,8 @@ export function ValidatePage() {
                 {allFiles.map((f, i) => (
                   <tr
                     key={f.fileName}
-                    className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${f.status !== 'PASS' ? 'cursor-pointer hover:bg-blue-50' : ''}`}
-                    onClick={() => f.status !== 'PASS' && setSelectedFile(f)}
+                    className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${f.totalPersons > 0 ? 'cursor-pointer hover:bg-blue-50' : ''}`}
+                    onClick={() => f.totalPersons > 0 && setSelectedFile(f)}
                   >
                     <td className="px-3 py-1.5">
                       <SchemaTooltip
@@ -816,7 +903,7 @@ export function ValidatePage() {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-gray-400 text-center">คลิกแถวที่มีปัญหาเพื่อดูรายชื่อ-HN-CID ของผู้ที่ต้องแก้ไข</p>
+          <p className="text-xs text-gray-400 text-center">คลิกแถวที่มีข้อมูลเพื่อดูรายชื่อ (ผ่าน / ไม่ผ่าน)</p>
 
           {/* Error Group Summary */}
           {report.errorGroupSummary.length > 0 && (
