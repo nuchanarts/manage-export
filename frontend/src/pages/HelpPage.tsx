@@ -58,7 +58,7 @@ export function HelpPage() {
           {AREAS.map(a => (
             <div
               key={a.title}
-              className={`rounded-xl p-5 border shadow-sm ${a.tone === 'a' ? 'app-accent-bg border-transparent' : 'bg-white border-gray-200'}`}
+              className={`rounded-xl p-5 border shadow-sm bg-white ${a.tone === 'a' ? 'border-2 app-accent-border' : 'border-gray-200'}`}
             >
               <div className="text-3xl mb-2">{a.icon}</div>
               <p className={`font-semibold ${a.tone === 'a' ? 'app-accent-text' : 'text-gray-800'}`}>{a.title}</p>

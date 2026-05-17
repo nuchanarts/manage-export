@@ -55,3 +55,6 @@
 .app-accent-bg {
   background-color: var(--app-accent-soft);
 }
+.app-accent-border {
+  border-color: var(--app-accent);
+}
