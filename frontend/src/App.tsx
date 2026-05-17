@@ -43,7 +43,7 @@ const NAV: NavItem[] = [
       {
         key: 'validate',
         icon: '📋',
-        label: 'ระบบตรวจสอบการส่งออกข้อมูลมาตรฐาน',
+        label: 'ตรวจสอบ 43 แฟ้ม',
         sublabel: 'ตรวจสอบความถูกต้องข้อมูล 43 แฟ้ม',
         ready: true,
       },
