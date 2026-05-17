@@ -202,6 +202,27 @@ export function formatRevertBanner(code: string, to: string | null): string {
   return `ย้อนแล้ว: ${code} กลับเป็น ${toDisplay}`
 }
 
+/**
+ * Converts the `categories` array from a `/_summary` response into a plain
+ * Record mapping category key → unmapped count.
+ *
+ * Rules:
+ *   - pending categories are excluded (no badge shown for pending)
+ *   - categories with unmapped == null | undefined | 0 are excluded
+ *   - only categories with unmapped > 0 and not pending are included
+ */
+export function summaryToUnmappedMap(
+  categories: { key: string; unmapped?: number | null; pending?: boolean }[],
+): Record<string, number> {
+  const result: Record<string, number> = {}
+  for (const cat of categories) {
+    if (cat.pending) continue
+    const count = cat.unmapped ?? 0
+    if (count > 0) result[cat.key] = count
+  }
+  return result
+}
+
 export type SortKey = 'code' | 'name' | 'std_code' | 'std_code2'
 export type SortDir = 'asc' | 'desc'
 

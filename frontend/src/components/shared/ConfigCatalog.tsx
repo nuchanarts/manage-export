@@ -13,6 +13,7 @@ import {
   formatRevertBanner,
   buildBulkMatchSummary,
   validateStdValue,
+  summaryToUnmappedMap,
   BasicRow,
   StdOption,
   StdRule,
@@ -242,10 +243,17 @@ function DataTable({
     })
   )
   const [saveErrMsg, setSaveErrMsg] = useState<string | null>(null)
+  // Summary queryKey — invalidated after any mapping mutation so sidebar badges refresh
+  const summaryQueryKey = [apiBase, '_summary']
+
   const save = useMutation({
     mutationFn: (v: { code: string; std_code: string }) =>
       axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { std_code: v.std_code }),
-    onSuccess: () => { setSaveErrMsg(null); qc.invalidateQueries({ queryKey: [apiBase, menu.key] }) },
+    onSuccess: () => {
+      setSaveErrMsg(null)
+      qc.invalidateQueries({ queryKey: [apiBase, menu.key] })
+      qc.invalidateQueries({ queryKey: summaryQueryKey })
+    },
     onError: (err) => {
       // F6: surface server-side INVALID_CODE message
       if (axios.isAxiosError(err) && err.response?.data?.error === 'INVALID_CODE') {
@@ -256,12 +264,18 @@ function DataTable({
   const save2 = useMutation({
     mutationFn: (v: { code: string; std_code2: string }) =>
       axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { std_code2: v.std_code2 }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [apiBase, menu.key] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [apiBase, menu.key] })
+      qc.invalidateQueries({ queryKey: summaryQueryKey })
+    },
   })
   const saveExtra = useMutation({
     mutationFn: (v: { code: string; index: number; value: string }) =>
       axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { extra: { index: v.index, value: v.value } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [apiBase, menu.key] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [apiBase, menu.key] })
+      qc.invalidateQueries({ queryKey: summaryQueryKey })
+    },
   })
 
   // ── F6: per-cell validation error state ─────────────────────────────────────
@@ -288,6 +302,7 @@ function DataTable({
       const { code, to } = resp.data.reverted
       setUndoMsg(formatRevertBanner(code, to))
       qc.invalidateQueries({ queryKey: [apiBase, menu.key] })
+      qc.invalidateQueries({ queryKey: summaryQueryKey })
     },
     onError: (err) => {
       if (axios.isAxiosError(err) && err.response?.data?.error === 'NO_HISTORY') {
@@ -385,6 +400,7 @@ function DataTable({
       const { updated, skipped, errors } = resp.data
       setImportMsg(buildImportSummary(updated, skipped, errors.length))
       qc.invalidateQueries({ queryKey: [apiBase, menu.key] })
+      qc.invalidateQueries({ queryKey: summaryQueryKey })
     } catch {
       setImportMsg('นำเข้าไม่สำเร็จ กรุณาตรวจสอบไฟล์')
     } finally {
@@ -433,6 +449,7 @@ function DataTable({
       setBulkMatchResult(resp.data)
       // Refresh the current table so newly-matched rows show
       qc.invalidateQueries({ queryKey: [apiBase, menu.key] })
+      qc.invalidateQueries({ queryKey: summaryQueryKey })
     } catch {
       setBulkMatchError('จับคู่อัตโนมัติทุกหมวดไม่สำเร็จ กรุณาลองใหม่')
     } finally {
@@ -787,6 +804,18 @@ export interface ConfigCatalogProps {
   initialCategoryKey?: string
 }
 
+// ─── Summary response shape (mirrors backend /_summary) ──────────────────────
+interface SummaryCategory {
+  key: string
+  label: string
+  pending: boolean
+  unmapped?: number | null
+}
+
+interface RegistrySummaryResponse {
+  categories: SummaryCategory[]
+}
+
 export function ConfigCatalog({ apiBase, sidebarTitle, relatedLinks, initialCategoryKey }: ConfigCatalogProps) {
   const { data: menus = [] } = useQuery({
     queryKey: [`${apiBase}-menus`],
@@ -794,6 +823,18 @@ export function ConfigCatalog({ apiBase, sidebarTitle, relatedLinks, initialCate
       axios.get<MenuItem[]>(apiBase).then(r => r.data),
     staleTime: 300_000,
   })
+
+  // F11: fetch /_summary for unmapped-count sidebar badges
+  const { data: summaryData } = useQuery({
+    queryKey: [apiBase, '_summary'],
+    queryFn: () =>
+      axios.get<RegistrySummaryResponse>(`${apiBase}/_summary`).then(r => r.data),
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+  })
+  const unmappedMap: Record<string, number> = summaryData
+    ? summaryToUnmappedMap(summaryData.categories)
+    : {}
 
   const [activeKey, setActiveKey] = useState<string | null>(null)
 
@@ -839,22 +880,37 @@ export function ConfigCatalog({ apiBase, sidebarTitle, relatedLinks, initialCate
           )}
         </div>
         <nav>
-          {menus.map(m => (
-            <button
-              key={m.key}
-              onClick={() => setActiveKey(m.key)}
-              className={`w-full text-left px-4 py-2.5 text-sm border-b border-gray-50 flex items-center justify-between gap-2 transition-colors ${
-                resolvedKey === m.key
-                  ? 'bg-blue-50 text-blue-800 font-semibold border-l-2 border-blue-600'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <span className="leading-snug">{m.label}</span>
-              {m.pending && (
-                <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="รอ SQL" />
-              )}
-            </button>
-          ))}
+          {menus.map(m => {
+            const unmappedCount = unmappedMap[m.key] ?? 0
+            return (
+              <button
+                key={m.key}
+                onClick={() => setActiveKey(m.key)}
+                className={`w-full text-left px-4 py-2.5 text-sm border-b border-gray-50 flex items-center justify-between gap-2 transition-colors ${
+                  resolvedKey === m.key
+                    ? 'bg-blue-50 text-blue-800 font-semibold border-l-2 border-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <span className="leading-snug flex-1 min-w-0">{m.label}</span>
+                <span className="shrink-0 flex items-center gap-1">
+                  {/* F11: unmapped-count badge — shown only for non-pending categories with unmapped > 0 */}
+                  {!m.pending && unmappedCount > 0 && (
+                    <span
+                      className="bg-red-100 text-red-700 text-[10px] px-1.5 rounded-full font-semibold leading-tight py-0.5"
+                      title={`ยังไม่ map ${unmappedCount} รายการ`}
+                    >
+                      {unmappedCount}
+                    </span>
+                  )}
+                  {/* Existing pending amber-dot */}
+                  {m.pending && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title="รอ SQL" />
+                  )}
+                </span>
+              </button>
+            )
+          })}
         </nav>
       </div>
 
