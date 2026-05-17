@@ -8,13 +8,14 @@ import { NhsoLinksPage } from './pages/NhsoLinksPage'
 import { HelpPage } from './pages/HelpPage'
 import { KnowledgePage } from './pages/KnowledgePage'
 import { GlobalSearchPage } from './pages/GlobalSearchPage'
+import { SnapshotsPage } from './pages/SnapshotsPage'
 import { THEMES, getStoredTheme, storeTheme } from './theme/theme'
 import { getOrCreateClientId } from './utils/clientId'
 import { onNavigate } from './data/appNav'
 import { LoginPage } from './pages/LoginPage'
 import { getAuth, clearAuth, initAxiosAuth } from './data/auth'
 
-type MenuKey = 'dashboard' | 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge' | 'global-search'
+type MenuKey = 'dashboard' | 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge' | 'global-search' | 'snapshots'
 
 interface NavItem {
   key: MenuKey
@@ -80,6 +81,13 @@ const NAV: NavItem[] = [
         icon: '💊',
         label: 'Drug Catalog Export',
         sublabel: 'ส่งออกแคตตาล็อกยา',
+        ready: true,
+      },
+      {
+        key: 'snapshots',
+        icon: '🗄️',
+        label: 'เวอร์ชัน/สแน็ปช็อต',
+        sublabel: 'บันทึก/กู้คืน mapping',
         ready: true,
       },
     ],
@@ -388,6 +396,7 @@ export function App() {
           {activeMenu === 'help' && <HelpPage />}
           {activeMenu === 'knowledge' && <KnowledgePage />}
           {activeMenu === 'global-search' && <GlobalSearchPage />}
+          {activeMenu === 'snapshots' && <SnapshotsPage />}
         </main>
       </div>
     </div>
