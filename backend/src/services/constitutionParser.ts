@@ -79,7 +79,7 @@ export function parseConstitution(): Map<string, FileSchemaDef> {
   if (_cache) return _cache
 
   const content = fs.readFileSync(findConstitutionPath(), 'utf-8')
-  const lines = content.split('\n')
+  const lines = content.replace(/\r/g, '').split('\n')
   const schemas = new Map<string, FileSchemaDef>()
 
   let currentFile: FileSchemaDef | null = null
