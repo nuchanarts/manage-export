@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { ValidatePage } from './pages/ValidatePage'
+import { DashboardPage } from './pages/DashboardPage'
 import { BasicConfigPage } from './pages/BasicConfigPage'
 import { EClaimConfigPage } from './pages/EClaimConfigPage'
 import { DrugCatalogPage } from './pages/DrugCatalogPage'
@@ -10,7 +11,7 @@ import { GlobalSearchPage } from './pages/GlobalSearchPage'
 import { THEMES, getStoredTheme, storeTheme } from './theme/theme'
 import { getOrCreateClientId } from './utils/clientId'
 
-type MenuKey = 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge' | 'global-search'
+type MenuKey = 'dashboard' | 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge' | 'global-search'
 
 interface NavItem {
   key: MenuKey
@@ -28,6 +29,13 @@ const NAV: NavItem[] = [
     label: 'ตรวจสอบข้อมูล',
     ready: true,
     children: [
+      {
+        key: 'dashboard',
+        icon: '📊',
+        label: 'ภาพรวมความครบถ้วน',
+        sublabel: 'สรุปก่อนส่งออก 43 แฟ้ม',
+        ready: true,
+      },
       {
         key: 'validate',
         icon: '📋',
@@ -297,6 +305,7 @@ export function App() {
         )}
 
         <main className="flex-1 overflow-y-auto p-6">
+          {activeMenu === 'dashboard' && <DashboardPage />}
           {activeMenu === 'validate' && <ValidatePage />}
           {activeMenu === 'nhso-links' && <NhsoLinksPage />}
           {activeMenu === 'basic-config' && <BasicConfigPage />}

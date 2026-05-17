@@ -20,6 +20,8 @@ import { autoMatchSuggestions } from '../../services/autoMatch'
 import type { AmRow, AmOption } from '../../services/autoMatch'
 import { matchRow, searchRowsAcross } from '../../services/search'
 import type { SearchRow } from '../../services/search'
+import { summarizeCounts } from '../../services/dashboard'
+import type { SummaryRow } from '../../services/dashboard'
 
 // Backward-compatible body schema: at least one of std_code, std_code2, or extra must be present
 // max(50) accommodates 24-char TMT drug codes and other longer standard codes.
@@ -67,6 +69,78 @@ export function makeConfigRouter(
 
   router.get('/', (_req: Request, res: Response) => {
     res.json(list())
+  })
+
+  // ── GET /_summary — completeness overview for all categories (F4) ────────────
+  // Registered BEFORE /:category to avoid the literal path being swallowed as a param.
+  router.get('/_summary', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const reg = registryName ?? 'basic'
+      const categories = list()
+
+      let totalRows = 0
+      let totalUnmapped = 0
+
+      const catResults: {
+        key: string
+        label: string
+        pending: boolean
+        total?: number
+        mapped?: number
+        unmapped?: number
+        percent?: number | null
+        error?: boolean
+      }[] = []
+
+      for (const cat of categories) {
+        if (cat.pending) {
+          catResults.push({ key: cat.key, label: cat.label, pending: true })
+          continue
+        }
+
+        const c = get(cat.key)
+        if (!c) {
+          // Shouldn't happen; guard anyway
+          catResults.push({ key: cat.key, label: cat.label, pending: false, error: true })
+          continue
+        }
+
+        try {
+          const { rows: rawRows } = await query(buildListSql(c))
+          const counts = summarizeCounts(rawRows as unknown as SummaryRow[])
+          totalRows += counts.total
+          totalUnmapped += counts.unmapped
+          catResults.push({
+            key: cat.key,
+            label: cat.label,
+            pending: false,
+            total: counts.total,
+            mapped: counts.mapped,
+            unmapped: counts.unmapped,
+            percent: counts.percent,
+          })
+        } catch (catErr) {
+          const errMsg = catErr instanceof Error ? catErr.message : String(catErr)
+          console.error(`[_summary/${reg}] category ${cat.key} failed:`, errMsg)
+          catResults.push({ key: cat.key, label: cat.label, pending: false, error: true })
+        }
+      }
+
+      const nonPendingWithCounts = catResults.filter(c => !c.pending && !c.error)
+      const totalMapped = totalRows - totalUnmapped
+      const overallPercent = totalRows > 0
+        ? Math.round((totalMapped / totalRows) * 100)
+        : null
+
+      res.json({
+        registry: reg,
+        totalCategories: categories.length,
+        totalRows,
+        totalUnmapped,
+        overallPercent,
+        categories: catResults,
+      })
+    } catch (err) { next(err) }
   })
 
   // ── POST /_auto-match-all — bulk auto-match across ALL non-pending categories (F5) ──
