@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { ValidatePage } from './pages/ValidatePage'
 import { BasicConfigPage } from './pages/BasicConfigPage'
 import { EClaimConfigPage } from './pages/EClaimConfigPage'
 import { NhsoLinksPage } from './pages/NhsoLinksPage'
+import { THEMES, getStoredTheme, storeTheme } from './theme/theme'
 
 type MenuKey = 'validate' | 'basic-config' | 'eclaim-config' | 'nhso-links'
 
@@ -122,6 +123,18 @@ export function App() {
   const [sidebarWidth, setSidebarWidth] = useState(240)
   const isResizing = useRef(false)
 
+  const [theme, setTheme] = useState<string>(() => getStoredTheme(window.localStorage))
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
+
+  function handleThemeChange(id: string) {
+    setTheme(id)
+    document.documentElement.setAttribute('data-theme', id)
+    storeTheme(window.localStorage, id)
+  }
+
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     isResizing.current = true
@@ -147,19 +160,32 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <header className="bg-blue-800 text-white shadow-md z-10">
+      <header className="app-header text-white shadow-md z-10">
         <div className="px-4 py-3 flex items-center gap-3">
-          <button onClick={() => setSidebarOpen(o => !o)} className="p-1.5 rounded hover:bg-blue-700 transition-colors shrink-0">
+          <button onClick={() => setSidebarOpen(o => !o)} className="p-1.5 rounded hover:bg-white/10 transition-colors shrink-0">
             <div className="space-y-1">
               <span className="block w-5 h-0.5 bg-white" />
               <span className="block w-5 h-0.5 bg-white" />
               <span className="block w-5 h-0.5 bg-white" />
             </div>
           </button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-lg font-bold leading-tight">ระบบตรวจสอบการส่งออกข้อมูลมาตรฐาน</h1>
-            <p className="text-blue-200 text-xs">{currentLabel}</p>
+            <p className="text-white/70 text-xs">{currentLabel}</p>
           </div>
+          {/* Theme switcher */}
+          <select
+            value={theme}
+            onChange={e => handleThemeChange(e.target.value)}
+            className="text-xs bg-white/15 text-white border border-white/30 rounded px-2 py-1 cursor-pointer hover:bg-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-white/40"
+            title="เปลี่ยนสีธีม"
+          >
+            {THEMES.map(t => (
+              <option key={t.id} value={t.id} className="text-gray-900 bg-white">
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
       </header>
 
