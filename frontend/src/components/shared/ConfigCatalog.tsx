@@ -10,6 +10,7 @@ import {
   sortRows,
   resolveComboCommit,
   buildImportSummary,
+  formatRevertBanner,
   BasicRow,
   StdOption,
   ExtraFieldMeta,
@@ -251,6 +252,27 @@ function DataTable({
     onSuccess: () => qc.invalidateQueries({ queryKey: [apiBase, menu.key] }),
   })
 
+  // ── Undo mutation (F2) ──
+  const [undoMsg, setUndoMsg] = useState<string | null>(null)
+  const undo = useMutation({
+    mutationFn: () =>
+      axios.post<{ ok: boolean; reverted: { code: string; field: string; from: string | null; to: string | null } }>(
+        `${apiBase}/${menu.key}/undo`,
+      ),
+    onSuccess: (resp) => {
+      const { code, to } = resp.data.reverted
+      setUndoMsg(formatRevertBanner(code, to))
+      qc.invalidateQueries({ queryKey: [apiBase, menu.key] })
+    },
+    onError: (err) => {
+      if (axios.isAxiosError(err) && err.response?.data?.error === 'NO_HISTORY') {
+        setUndoMsg('ไม่มีประวัติให้ย้อน')
+      } else {
+        setUndoMsg('ย้อนไม่สำเร็จ')
+      }
+    },
+  })
+
   // ── Filter toggle state ──
   const [showUnmappedOnly, setShowUnmappedOnly] = useState(false)
 
@@ -460,6 +482,19 @@ function DataTable({
 
             {autoMatchMsg && (
               <span className="text-sm text-gray-600">{autoMatchMsg}</span>
+            )}
+
+            <button
+              onClick={() => { setUndoMsg(null); undo.mutate() }}
+              disabled={undo.isPending}
+              className="px-3 py-1 text-sm rounded border border-orange-500 text-orange-700 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="ย้อนรหัสล่าสุด"
+            >
+              {undo.isPending ? 'กำลังย้อน...' : '↩ ย้อนรหัสล่าสุด'}
+            </button>
+
+            {undoMsg && (
+              <span className="text-sm text-gray-600">{undoMsg}</span>
             )}
           </>
         )}

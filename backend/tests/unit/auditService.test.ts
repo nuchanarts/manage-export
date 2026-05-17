@@ -1,5 +1,5 @@
 // backend/tests/unit/auditService.test.ts
-// RED → GREEN: tests for auditService (recordMappingChange, getAudit, ensureAuditTable)
+// RED → GREEN: tests for auditService (recordMappingChange, getAudit, ensureAuditTable, getLastChange, resolveAuditField)
 
 const mockQuery = jest.fn()
 jest.mock('../../src/db', () => ({ query: (...a: unknown[]) => mockQuery(...a) }))
@@ -9,6 +9,8 @@ import {
   getAudit,
   ensureAuditTable,
   _resetEnsureForTest,
+  getLastChange,
+  resolveAuditField,
 } from '../../src/services/auditService'
 
 beforeEach(() => {
@@ -231,5 +233,91 @@ describe('getAudit', () => {
 
     const result = await getAudit('eclaim', 'eclaim-inscl')
     expect(result).toEqual([])
+  })
+})
+
+// ─── getLastChange ────────────────────────────────────────────────────────────
+
+describe('getLastChange', () => {
+  it('calls ensureAuditTable then queries with ORDER BY id DESC LIMIT 1', async () => {
+    const fakeRow = {
+      id: 42, ts: '2026-05-17T10:00:00', code: '05', field: 'std_code',
+      old_value: null, new_value: '0510', actor: 'nurse01',
+    }
+    mockQuery
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })           // ensure
+      .mockResolvedValueOnce({ rows: [fakeRow], rowCount: 1 })    // SELECT
+
+    const result = await getLastChange('basic', 'occupation')
+
+    expect(mockQuery).toHaveBeenCalledTimes(2)
+    const [selSql, selParams] = mockQuery.mock.calls[1]
+    expect(selSql).toContain('FROM `bgs_mapping_audit`')
+    expect(selSql).toContain('WHERE `registry` = ? AND `category` = ?')
+    expect(selSql).toContain('ORDER BY `id` DESC')
+    expect(selSql).toContain('LIMIT 1')
+    expect(selParams).toEqual(['basic', 'occupation'])
+    expect(result).toEqual(fakeRow)
+  })
+
+  it('returns null when no rows exist for that registry+category', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })    // ensure
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })    // SELECT returns empty
+
+    const result = await getLastChange('eclaim', 'eclaim-inscl')
+    expect(result).toBeNull()
+  })
+
+  it('selects the id column (needed for ordering)', async () => {
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 0 })
+
+    await getLastChange('basic', 'occupation')
+    const selSql: string = mockQuery.mock.calls[1][0]
+    // Must select id so callers can inspect the row id
+    expect(selSql).toContain('`id`')
+  })
+
+  it('parameterizes both registry and category (no string interpolation in WHERE)', async () => {
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 0 })
+
+    await getLastChange('eclaim', 'eclaim-clinic')
+    const [selSql, selParams] = mockQuery.mock.calls[1]
+    // WHERE clause uses ? placeholders, not embedded values
+    expect(selSql).toContain('? AND `category` = ?')
+    expect(selParams[0]).toBe('eclaim')
+    expect(selParams[1]).toBe('eclaim-clinic')
+  })
+})
+
+// ─── resolveAuditField ────────────────────────────────────────────────────────
+
+describe('resolveAuditField', () => {
+  it('returns {kind:"primary"} for "std_code"', () => {
+    expect(resolveAuditField('std_code')).toEqual({ kind: 'primary' })
+  })
+
+  it('returns {kind:"secondary"} for "std_code2"', () => {
+    expect(resolveAuditField('std_code2')).toEqual({ kind: 'secondary' })
+  })
+
+  it('returns {kind:"extra", index:0} for "std_code_e0"', () => {
+    expect(resolveAuditField('std_code_e0')).toEqual({ kind: 'extra', index: 0 })
+  })
+
+  it('returns {kind:"extra", index:3} for "std_code_e3"', () => {
+    expect(resolveAuditField('std_code_e3')).toEqual({ kind: 'extra', index: 3 })
+  })
+
+  it('returns {kind:"extra", index:12} for "std_code_e12"', () => {
+    expect(resolveAuditField('std_code_e12')).toEqual({ kind: 'extra', index: 12 })
+  })
+
+  it('throws for an unknown field name', () => {
+    expect(() => resolveAuditField('unknown_field')).toThrow()
+  })
+
+  it('throws for a malformed extra field ("std_code_eX" — non-numeric)', () => {
+    expect(() => resolveAuditField('std_code_eX')).toThrow()
   })
 })

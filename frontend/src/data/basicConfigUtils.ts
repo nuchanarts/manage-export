@@ -121,6 +121,15 @@ export function buildImportSummary(updated: number, skipped: number, errors: num
   return `อัปเดต ${updated} · ข้าม ${skipped} · ผิดพลาด ${errors}`
 }
 
+/**
+ * Formats the undo success banner text.
+ * e.g. "ย้อนแล้ว: 05 กลับเป็น 0100" or "ย้อนแล้ว: 05 กลับเป็น (ว่าง)"
+ */
+export function formatRevertBanner(code: string, to: string | null): string {
+  const toDisplay = to != null && to !== '' ? to : '(ว่าง)'
+  return `ย้อนแล้ว: ${code} กลับเป็น ${toDisplay}`
+}
+
 export type SortKey = 'code' | 'name' | 'std_code' | 'std_code2'
 export type SortDir = 'asc' | 'desc'
 

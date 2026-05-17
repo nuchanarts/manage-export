@@ -24,12 +24,22 @@ export interface AuditEntry {
 }
 
 export interface AuditRow {
+  id?: number            // present in getLastChange result
   ts: string             // ISO-formatted datetime string
   code: string
   field: string
   old_value: string | null
   new_value: string | null
   actor: string
+}
+
+/**
+ * Describes which kind of mapping field an audit field string refers to.
+ * Returned by resolveAuditField().
+ */
+export interface AuditFieldResolution {
+  kind: 'primary' | 'secondary' | 'extra'
+  index?: number   // only set when kind === 'extra'
 }
 
 // ── Audit table name (constant; never from user input) ───────────────────────
@@ -119,6 +129,43 @@ export async function getAudit(
     `LIMIT ${safeLimit}`
   const { rows } = await query(sql, [registry, category])
   return rows as unknown as AuditRow[]
+}
+
+/**
+ * Returns the single most recent audit row for a registry+category,
+ * or null if no rows exist.
+ * Uses ORDER BY id DESC LIMIT 1 — parameterized; table/col names are literals.
+ */
+export async function getLastChange(
+  registry: 'basic' | 'eclaim',
+  category: string,
+): Promise<AuditRow | null> {
+  await ensureAuditTable()
+  const sql =
+    `SELECT \`id\`, \`ts\`, \`code\`, \`field\`, \`old_value\`, \`new_value\`, \`actor\` ` +
+    `FROM \`${AUDIT_TABLE}\` ` +
+    'WHERE `registry` = ? AND `category` = ? ' +
+    `ORDER BY \`id\` DESC ` +
+    'LIMIT 1'
+  const { rows } = await query(sql, [registry, category])
+  const arr = rows as unknown as AuditRow[]
+  return arr.length > 0 ? arr[0]! : null
+}
+
+/**
+ * Parses an audit field string ('std_code' | 'std_code2' | 'std_code_e{i}')
+ * and returns a structured resolution object for selecting the correct SQL builder.
+ *
+ * Throws if the field string is unrecognised.
+ */
+export function resolveAuditField(field: string): AuditFieldResolution {
+  if (field === 'std_code') return { kind: 'primary' }
+  if (field === 'std_code2') return { kind: 'secondary' }
+  const extraMatch = /^std_code_e(\d+)$/.exec(field)
+  if (extraMatch) {
+    return { kind: 'extra', index: parseInt(extraMatch[1]!, 10) }
+  }
+  throw new Error(`resolveAuditField: unrecognised field '${field}'`)
 }
 
 /** Resets the memoized ensure-promise (for testing only). */

@@ -14,7 +14,7 @@ import {
   buildSelectCurrentSql,
 } from '../../services/categoryRegistry'
 import { mapHeaderRowToFields, normalizeCellValue } from '../../services/excelMappingIO'
-import { recordMappingChange, getAudit } from '../../services/auditService'
+import { recordMappingChange, getAudit, getLastChange, resolveAuditField } from '../../services/auditService'
 
 // Backward-compatible body schema: at least one of std_code, std_code2, or extra must be present
 const bodySchema = z.object({
@@ -125,6 +125,83 @@ export function makeConfigRouter(
       const reg = registryName ?? 'basic'
       const rows = await getAudit(reg, category, isNaN(limit) ? 100 : limit)
       res.json(rows)
+    } catch (err) { next(err) }
+  })
+
+  // ── POST /:category/undo — revert the most recent mapping change (F2) ───────
+  router.post('/:category/undo', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const category = String(req.params.category)
+      const c = get(category)
+      if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${category}`)
+      // Pending guard: undo is a write operation; pending categories cannot be edited
+      if (c.pending) throw new AppError(400, 'PENDING_CATEGORY', `หมวด ${category} ยังไม่พร้อมใช้งาน (ยังไม่ได้ยืนยันการจับคู่)`)
+
+      const reg = registryName ?? 'basic'
+      const last = await getLastChange(reg, category)
+      if (!last) {
+        throw new AppError(400, 'NO_HISTORY', 'ไม่มีประวัติให้ย้อน')
+      }
+
+      // Verify the code still exists in the master table
+      const existsResult = await query(buildExistsSql(c), [last.code])
+      if (existsResult.rowCount === 0) {
+        throw new AppError(400, 'CODE_GONE', `รหัส ${last.code} ไม่พบในตาราง (อาจถูกลบแล้ว)`)
+      }
+
+      // Determine the revert value: old_value of the last change
+      const revertTo = last.old_value  // null or string
+
+      // Select the correct SQL builder based on which field was last changed
+      const resolution = resolveAuditField(last.field)
+      let updateSql: string
+      let updateParams: (string | null)[]
+
+      if (resolution.kind === 'primary') {
+        const built = buildUpdateSql(c, last.code, revertTo ?? '')
+        updateSql = built.sql
+        updateParams = built.params
+      } else if (resolution.kind === 'secondary') {
+        if (!c.mapCol2) throw new AppError(400, 'INVALID_FIELD', `หมวด ${category} ไม่มี std_code2`)
+        const built = buildUpdateSql2(c, last.code, revertTo ?? '')
+        updateSql = built.sql
+        updateParams = built.params
+      } else {
+        // extra field
+        const idx = resolution.index!
+        if (!c.extraFields || idx < 0 || idx >= c.extraFields.length) {
+          throw new AppError(400, 'INVALID_FIELD', `หมวด ${category} ไม่มี extraField index ${idx}`)
+        }
+        const built = buildUpdateSqlExtra(c, idx, last.code, revertTo ?? '')
+        updateSql = built.sql
+        updateParams = built.params
+      }
+
+      // Apply the revert
+      await query(updateSql, updateParams)
+
+      // Record the undo itself as an audit row (enables walk-back / redo).
+      // Best-effort: never break the revert if audit insert fails.
+      const actor = req.header('x-actor') || 'undo'
+      await recordMappingChange({
+        registry: reg,
+        category,
+        code: last.code,
+        field: last.field,
+        oldValue: last.new_value,    // what it was before this undo
+        newValue: last.old_value,    // what it is now (the reverted value)
+        actor,
+      })
+
+      res.json({
+        ok: true,
+        reverted: {
+          code: last.code,
+          field: last.field,
+          from: last.new_value,   // the value that was undone
+          to: last.old_value,     // the value restored
+        },
+      })
     } catch (err) { next(err) }
   })
 
