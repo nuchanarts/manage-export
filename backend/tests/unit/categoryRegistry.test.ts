@@ -52,6 +52,16 @@ describe('SQL builders', () => {
   })
 })
 
+describe('buildExistsSql', () => {
+  it('returns a parameterized SELECT 1 through ident() allow-list for occupation', () => {
+    const { buildExistsSql } = require('../../src/services/categoryRegistry')
+    const occ = getCategory('occupation')!
+    expect(buildExistsSql(occ)).toBe(
+      'SELECT 1 FROM `occupation` WHERE `occupation` = ? LIMIT 1'
+    )
+  })
+})
+
 describe('registry integrity', () => {
   it('uses only safe identifiers everywhere', () => {
     const safe = /^[A-Za-z0-9_]+$/

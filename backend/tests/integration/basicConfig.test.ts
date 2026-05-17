@@ -43,4 +43,13 @@ describe('basic-config routes', () => {
     const res = await request(app).put('/api/basic-config/occupation/05').send({})
     expect(res.status).toBe(400)
   })
+
+  it('PUT to a pending category → 400 PENDING_CATEGORY (no DB call needed)', async () => {
+    // 'clinic' is pending:true in the registry
+    const res = await request(app).put('/api/basic-config/clinic/001').send({ std_code: '001' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('PENDING_CATEGORY')
+    // Guard fires before any DB call — mock should never have been invoked
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
 })

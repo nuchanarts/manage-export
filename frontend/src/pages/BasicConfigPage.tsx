@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { isUnmapped, summarize, BasicRow } from '../data/basicConfigUtils'
 
-function DataTable({ menu }: { menu: { key: string; label: string } }) {
+function DataTable({ menu }: { menu: { key: string; label: string; pending: boolean } }) {
   const qc = useQueryClient()
   const { data: rows = [], isLoading, isError } = useQuery({
     queryKey: ['basic-config', menu.key],
@@ -36,6 +36,11 @@ function DataTable({ menu }: { menu: { key: string; label: string } }) {
           </span>
         </p>
       </div>
+      {menu.pending && (
+        <div className="px-4 py-2 text-sm text-amber-700 bg-amber-50 border-b">
+          หมวดนี้ยังไม่พร้อมแก้ไข (รอยืนยันการจับคู่รหัส)
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-blue-700 text-white">
@@ -56,16 +61,20 @@ function DataTable({ menu }: { menu: { key: string; label: string } }) {
                   {row.name}
                 </td>
                 <td className="px-3 py-2">
-                  <select
-                    defaultValue={row.std_code ?? ''}
-                    onChange={e => save.mutate({ code: row.code, std_code: e.target.value })}
-                    className="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-md"
-                  >
-                    <option value="">— ยังไม่ map —</option>
-                    {opts.map(o => (
-                      <option key={o.code} value={o.code}>{o.code} — {o.name}</option>
-                    ))}
-                  </select>
+                  {menu.pending ? (
+                    <span className="text-gray-500">{row.std_code ?? '—'}</span>
+                  ) : (
+                    <select
+                      defaultValue={row.std_code ?? ''}
+                      onChange={e => save.mutate({ code: row.code, std_code: e.target.value })}
+                      className="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-md"
+                    >
+                      <option value="">— ยังไม่ map —</option>
+                      {opts.map(o => (
+                        <option key={o.code} value={o.code}>{o.code} — {o.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </td>
               </tr>
             ))}

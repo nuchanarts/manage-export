@@ -222,3 +222,7 @@ export function buildUpdateSql(
     params: [stdCode === '' ? null : stdCode, code],
   }
 }
+
+export function buildExistsSql(c: CategoryDef): string {
+  return `SELECT 1 FROM ${ident(c.table)} WHERE ${ident(c.pk)} = ? LIMIT 1`
+}

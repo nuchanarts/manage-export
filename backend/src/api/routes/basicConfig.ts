@@ -4,7 +4,7 @@ import { query } from '../../db'
 import { AppError } from '../../middleware/errorHandler'
 import {
   getCategory, listCategories,
-  buildListSql, buildStdOptionsSql, buildUpdateSql,
+  buildListSql, buildStdOptionsSql, buildUpdateSql, buildExistsSql,
 } from '../../services/categoryRegistry'
 
 const router = Router()
@@ -39,12 +39,12 @@ router.put('/:category/:code', async (req: Request, res: Response, next: NextFun
     const category = String(req.params.category)
     const c = getCategory(category)
     if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${category}`)
+    if (c.pending) throw new AppError(400, 'PENDING_CATEGORY', `หมวด ${category} ยังไม่พร้อมใช้งาน (ยังไม่ได้ยืนยันการจับคู่)`)
     const parsed = bodySchema.safeParse(req.body)
     if (!parsed.success) throw new AppError(400, 'INVALID_BODY', 'ต้องระบุ std_code')
     const code = String(req.params.code)
 
-    const exists = await query(
-      `SELECT 1 FROM \`${c.table}\` WHERE \`${c.pk}\` = ? LIMIT 1`, [code])
+    const exists = await query(buildExistsSql(c), [code])
     if (exists.rowCount === 0) throw new AppError(404, 'NOT_FOUND', `ไม่พบรหัส: ${code}`)
 
     const { sql, params } = buildUpdateSql(c, code, parsed.data.std_code)
