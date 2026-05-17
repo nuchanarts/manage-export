@@ -16,8 +16,9 @@ router.get('/', (_req: Request, res: Response) => {
 
 router.get('/:category', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const c = getCategory(req.params.category)
-    if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${req.params.category}`)
+    const category = String(req.params.category)
+    const c = getCategory(category)
+    if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${category}`)
     const { rows } = await query(buildListSql(c))
     res.json(rows.map(r => ({ ...r, mapped: !!r.mapped && r.std_code != null && r.std_code !== '' })))
   } catch (err) { next(err) }
@@ -25,8 +26,9 @@ router.get('/:category', async (req: Request, res: Response, next: NextFunction)
 
 router.get('/:category/std-options', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const c = getCategory(req.params.category)
-    if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${req.params.category}`)
+    const category = String(req.params.category)
+    const c = getCategory(category)
+    if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${category}`)
     const { rows } = await query(buildStdOptionsSql(c))
     res.json(rows)
   } catch (err) { next(err) }
@@ -34,11 +36,12 @@ router.get('/:category/std-options', async (req: Request, res: Response, next: N
 
 router.put('/:category/:code', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const c = getCategory(req.params.category)
-    if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${req.params.category}`)
+    const category = String(req.params.category)
+    const c = getCategory(category)
+    if (!c) throw new AppError(404, 'NOT_FOUND', `ไม่พบหมวด: ${category}`)
     const parsed = bodySchema.safeParse(req.body)
     if (!parsed.success) throw new AppError(400, 'INVALID_BODY', 'ต้องระบุ std_code')
-    const code = req.params.code
+    const code = String(req.params.code)
 
     const exists = await query(
       `SELECT 1 FROM \`${c.table}\` WHERE \`${c.pk}\` = ? LIMIT 1`, [code])
