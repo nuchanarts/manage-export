@@ -9,6 +9,7 @@ import {
   autoMatchSuggestions,
   sortRows,
   resolveComboCommit,
+  buildImportSummary,
   BasicRow,
   StdOption,
   ExtraFieldMeta,
@@ -313,6 +314,34 @@ function DataTable({
   const [matching, setMatching] = useState(false)
   const [autoMatchMsg, setAutoMatchMsg] = useState<string | null>(null)
 
+  // ── Export / Import state ──
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const [importMsg, setImportMsg] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+
+  async function handleImportFile(file: File) {
+    setImportMsg(null)
+    setImporting(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const resp = await axios.post<{ updated: number; skipped: number; errors: string[] }>(
+        `${apiBase}/${menu.key}/import`,
+        form,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      )
+      const { updated, skipped, errors } = resp.data
+      setImportMsg(buildImportSummary(updated, skipped, errors.length))
+      qc.invalidateQueries({ queryKey: [apiBase, menu.key] })
+    } catch {
+      setImportMsg('นำเข้าไม่สำเร็จ กรุณาตรวจสอบไฟล์')
+    } finally {
+      setImporting(false)
+      // Reset so the same file can be chosen again
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   if (isLoading) return <div className="p-12 text-center text-gray-400">กำลังโหลด...</div>
   if (isError) return <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
 
@@ -369,6 +398,45 @@ function DataTable({
           className="border border-gray-300 rounded px-2 py-1 text-sm w-52"
           aria-label="ค้นหารายการ"
         />
+
+        {/* Export button — always enabled (read-only, allowed for pending categories too) */}
+        <a
+          href={`${apiBase}/${menu.key}/export`}
+          download={`${menu.key}.xlsx`}
+          className="px-3 py-1 text-sm rounded border border-green-600 text-green-700 hover:bg-green-50 no-underline"
+          aria-label="ส่งออก Excel"
+        >
+          ⬇ ส่งออก Excel
+        </a>
+
+        {/* Import button — only for non-pending categories */}
+        {!menu.pending && (
+          <>
+            <button
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+              className="px-3 py-1 text-sm rounded border border-amber-600 text-amber-700 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="นำเข้า Excel"
+            >
+              {importing ? 'กำลังนำเข้า...' : '⬆ นำเข้า Excel'}
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) handleImportFile(file)
+              }}
+              aria-hidden="true"
+            />
+          </>
+        )}
+
+        {importMsg && (
+          <span className="text-sm text-gray-600">{importMsg}</span>
+        )}
 
         {!menu.pending && (
           <>

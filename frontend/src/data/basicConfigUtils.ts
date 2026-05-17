@@ -113,6 +113,14 @@ export function resolveComboCommit(query: string, options: StdOption[]): string 
   return trimmed
 }
 
+/**
+ * Build the import result summary string from the backend response.
+ * e.g. "อัปเดต 5 · ข้าม 2 · ผิดพลาด 0"
+ */
+export function buildImportSummary(updated: number, skipped: number, errors: number): string {
+  return `อัปเดต ${updated} · ข้าม ${skipped} · ผิดพลาด ${errors}`
+}
+
 export type SortKey = 'code' | 'name' | 'std_code' | 'std_code2'
 export type SortDir = 'asc' | 'desc'
 
