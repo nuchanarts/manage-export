@@ -158,7 +158,7 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
   // drugitems_ned_reason_list(doctor_reason PK, claim_control mapCol) — 4 cols only: doctor_reason, claim_control, hos_guid, hos_guid_ext
   // WHERE is on doctor_reason (row identity); writable column is claim_control (distinct NED code) — safe to edit, no PK overwrite
   // [verified 2026-05-17; self-referential std table for code lookup is intentional]
-  { key: 'drug-ned-reason', label: 'เหตุผลการสั่งยา',
+  { key: 'drug-ned-reason', label: 'เหตุผลการสั่งยา NED',
     table: 'drugitems_ned_reason_list', pk: 'doctor_reason', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
     pending: false },
