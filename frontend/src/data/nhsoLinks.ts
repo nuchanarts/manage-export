@@ -23,6 +23,7 @@ export const NHSO_LINKS: NhsoLink[] = [
   { category: 'เบิกจ่ายชดเชยค่าบริการ', revenue: REVENUE, name: 'Emergency Claim Online (UCEP)', url: 'https://ucep.nhso.go.th/UCEP/#/home' },
 
   // --- ลงทะเบียน/ตรวจสอบสิทธิหน่วยบริการ (revenue) ---
+  { category: 'ลงทะเบียน/ตรวจสอบสิทธิ', revenue: REVENUE, name: 'ระบบหน่วยบริการ สปสช. (Service Unit)', url: 'https://serviceunit-nhsodp.nhso.go.th/login' },
   { category: 'ลงทะเบียน/ตรวจสอบสิทธิ', revenue: REVENUE, name: 'สถิติและรายงาน (UC Info)', url: 'https://ucinfo.nhso.go.th/ucinfo' },
   { category: 'ลงทะเบียน/ตรวจสอบสิทธิ', revenue: REVENUE, name: 'ค้นหาสถานพยาบาลทั้งประเทศ (กยผ.)', url: 'https://hcode.moph.go.th/code/' },
   { category: 'ลงทะเบียน/ตรวจสอบสิทธิ', revenue: REVENUE, name: 'โปรแกรมค้นหาข้อมูลหน่วยบริการ (กยผ.)', url: 'https://reghosp.nhso.go.th/hospital_search/index.xhtml' },
