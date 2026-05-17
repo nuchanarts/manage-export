@@ -19,30 +19,31 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   {
-    key: 'validate',
+    key: 'validate',   // group header — uses children
     icon: '✅',
-    label: 'ระบบตรวจสอบการส่งออกข้อมูลมาตรฐาน',
-    sublabel: 'ตรวจสอบความถูกต้องข้อมูล 43 แฟ้ม',
-    ready: true,
-  },
-  {
-    key: 'basic-config',   // key ของ parent ไม่ถูกใช้งาน — ใช้ children แทน
-    icon: '⚙️',
-    label: 'การตั้งค่า',
+    label: 'ตรวจสอบข้อมูล',
     ready: true,
     children: [
       {
-        key: 'nhso-links',
-        icon: '🔗',
-        label: 'ลิงก์บริการ สปสช.',
-        sublabel: 'รวมลิงก์งานจัดเก็บรายได้',
+        key: 'validate',
+        icon: '📋',
+        label: 'ระบบตรวจสอบการส่งออกข้อมูลมาตรฐาน',
+        sublabel: 'ตรวจสอบความถูกต้องข้อมูล 43 แฟ้ม',
         ready: true,
       },
+    ],
+  },
+  {
+    key: 'basic-config',   // group header — uses children
+    icon: '⚙️',
+    label: 'ตั้งค่าข้อมูลพื้นฐาน',
+    ready: true,
+    children: [
       {
         key: 'basic-config',
         icon: '🗂️',
         label: 'ตั้งค่าข้อมูลพื้นฐาน 43 แฟ้ม',
-        sublabel: 'ส่งออก 43 แฟ้ม',
+        sublabel: 'จับคู่รหัสส่งออก 43 แฟ้ม',
         ready: true,
       },
       {
@@ -55,11 +56,26 @@ const NAV: NavItem[] = [
     ],
   },
   {
-    key: 'help',
-    icon: '❓',
-    label: 'ช่วยเหลือ',
-    sublabel: 'คู่มือการใช้งาน',
+    key: 'nhso-links',   // group header — uses children
+    icon: '📚',
+    label: 'ลิงก์ & ช่วยเหลือ',
     ready: true,
+    children: [
+      {
+        key: 'nhso-links',
+        icon: '🔗',
+        label: 'ลิงก์บริการ สปสช.',
+        sublabel: 'รวมลิงก์งานจัดเก็บรายได้',
+        ready: true,
+      },
+      {
+        key: 'help',
+        icon: '❓',
+        label: 'ช่วยเหลือ',
+        sublabel: 'คู่มือการใช้งาน',
+        ready: true,
+      },
+    ],
   },
 ]
 
