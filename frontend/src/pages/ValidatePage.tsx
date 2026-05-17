@@ -870,8 +870,8 @@ export function ValidatePage() {
                   <th className="text-left px-3 py-2">FileName</th>
                   <th className="text-left px-3 py-2 min-w-[160px]">ลักษณะแฟ้ม</th>
                   <th className="text-right px-3 py-2">Record</th>
-                  <th className="text-right px-3 py-2 text-green-200">ผ่าน (คน)</th>
-                  <th className="text-right px-3 py-2 text-red-200">ไม่ผ่าน (คน)</th>
+                  <th className="text-right px-3 py-2 text-green-200">ผ่าน</th>
+                  <th className="text-right px-3 py-2 text-red-200">ไม่ผ่าน</th>
                   <th className="text-right px-3 py-2">ร้อยละ</th>
                   <th className="text-left px-3 py-2">คอลัมน์ขาด / ปัญหาหลัก</th>
                 </tr>
