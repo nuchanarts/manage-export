@@ -175,7 +175,7 @@ function SidebarItem({
 }
 
 export function App() {
-  const [activeMenu, setActiveMenu] = useState<MenuKey>('validate')
+  const [activeMenu, setActiveMenu] = useState<MenuKey>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(288)
   const isResizing = useRef(false)
