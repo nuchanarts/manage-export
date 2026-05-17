@@ -11,9 +11,11 @@ import {
   resolveComboCommit,
   buildImportSummary,
   formatRevertBanner,
+  buildBulkMatchSummary,
   BasicRow,
   StdOption,
   ExtraFieldMeta,
+  BulkMatchResult,
   SortKey,
   SortDir,
 } from '../../data/basicConfigUtils'
@@ -336,6 +338,11 @@ function DataTable({
   const [matching, setMatching] = useState(false)
   const [autoMatchMsg, setAutoMatchMsg] = useState<string | null>(null)
 
+  // ── Bulk auto-match state (F5) ──
+  const [bulkMatching, setBulkMatching] = useState(false)
+  const [bulkMatchResult, setBulkMatchResult] = useState<BulkMatchResult | null>(null)
+  const [bulkMatchError, setBulkMatchError] = useState<string | null>(null)
+
   // ── Export / Import state ──
   const importInputRef = useRef<HTMLInputElement>(null)
   const [importMsg, setImportMsg] = useState<string | null>(null)
@@ -390,6 +397,23 @@ function DataTable({
       setAutoMatchMsg(`จับคู่อัตโนมัติ ${suggestions.length} รายการ`)
     } finally {
       setMatching(false)
+    }
+  }
+
+  async function handleBulkAutoMatch() {
+    setBulkMatchResult(null)
+    setBulkMatchError(null)
+    if (!window.confirm('จับคู่อัตโนมัติทุกหมวด? ระบบจะเขียนค่ากลับ HIS')) return
+    setBulkMatching(true)
+    try {
+      const resp = await axios.post<BulkMatchResult>(`${apiBase}/_auto-match-all`)
+      setBulkMatchResult(resp.data)
+      // Refresh the current table so newly-matched rows show
+      qc.invalidateQueries({ queryKey: [apiBase, menu.key] })
+    } catch {
+      setBulkMatchError('จับคู่อัตโนมัติทุกหมวดไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setBulkMatching(false)
     }
   }
 
@@ -482,6 +506,19 @@ function DataTable({
 
             {autoMatchMsg && (
               <span className="text-sm text-gray-600">{autoMatchMsg}</span>
+            )}
+
+            <button
+              onClick={handleBulkAutoMatch}
+              disabled={bulkMatching}
+              className="px-3 py-1 text-sm rounded border border-indigo-600 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="จับคู่อัตโนมัติทุกหมวดพร้อมกัน"
+            >
+              {bulkMatching ? 'กำลังจับคู่ทุกหมวด...' : '⚡ จับคู่อัตโนมัติทุกหมวด'}
+            </button>
+
+            {bulkMatchError && (
+              <span className="text-sm text-red-600">{bulkMatchError}</span>
             )}
 
             <button
@@ -632,6 +669,52 @@ function DataTable({
       </div>
       {save.isError && <div className="px-4 py-2 text-sm text-red-700 bg-red-50">บันทึกไม่สำเร็จ</div>}
       {save.isSuccess && <div className="px-4 py-2 text-sm text-green-700 bg-green-50">บันทึกแล้ว</div>}
+
+      {/* Bulk auto-match result panel (F5) */}
+      {bulkMatchResult && (
+        <div className="border-t border-gray-200 bg-indigo-50 px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-indigo-800">
+              {buildBulkMatchSummary(bulkMatchResult)}
+            </p>
+            <button
+              onClick={() => setBulkMatchResult(null)}
+              className="text-xs text-gray-500 hover:text-gray-700"
+              aria-label="ปิดผลการจับคู่"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-indigo-100 text-indigo-800">
+                  <th className="text-left px-2 py-1 font-medium">หมวด</th>
+                  <th className="text-right px-2 py-1 font-medium">จับคู่แล้ว</th>
+                  <th className="text-right px-2 py-1 font-medium">ยังไม่ map</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-indigo-100">
+                {bulkMatchResult.results
+                  .filter(r => !r.skippedPending)
+                  .sort((a, b) => b.matched - a.matched)
+                  .map(r => (
+                    <tr key={r.category} className={r.matched > 0 ? 'bg-white' : 'text-gray-400'}>
+                      <td className="px-2 py-1">{r.label}</td>
+                      <td className="text-right px-2 py-1 font-medium text-green-700">{r.matched}</td>
+                      <td className="text-right px-2 py-1">{r.unmatched}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+          {bulkMatchResult.errors.length > 0 && (
+            <p className="mt-2 text-xs text-red-600">
+              ผิดพลาด {bulkMatchResult.errors.length} หมวด: {bulkMatchResult.errors.map(e => e.category).join(', ')}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

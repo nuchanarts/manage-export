@@ -153,7 +153,7 @@ function SidebarItem({
 export function App() {
   const [activeMenu, setActiveMenu] = useState<MenuKey>('validate')
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [sidebarWidth, setSidebarWidth] = useState(240)
+  const [sidebarWidth, setSidebarWidth] = useState(288)
   const isResizing = useRef(false)
 
   const [theme, setTheme] = useState<string>(() => getStoredTheme(window.localStorage))
@@ -209,7 +209,7 @@ export function App() {
     document.body.style.userSelect = 'none'
     const onMove = (ev: MouseEvent) => {
       if (!isResizing.current) return
-      setSidebarWidth(Math.min(420, Math.max(180, ev.clientX)))
+      setSidebarWidth(Math.min(460, Math.max(240, ev.clientX)))
     }
     const onUp = () => {
       isResizing.current = false

@@ -122,6 +122,35 @@ export function buildImportSummary(updated: number, skipped: number, errors: num
 }
 
 /**
+ * Per-category result from the bulk auto-match response.
+ */
+export interface BulkMatchCategoryResult {
+  category: string
+  label: string
+  matched: number
+  unmatched: number
+  skippedPending?: boolean
+}
+
+/**
+ * Full response shape from POST /_auto-match-all.
+ */
+export interface BulkMatchResult {
+  totalCategories: number
+  totalMatched: number
+  results: BulkMatchCategoryResult[]
+  errors: { category: string; error: string }[]
+}
+
+/**
+ * Builds a one-line summary banner for the bulk auto-match operation.
+ * e.g. "จับคู่อัตโนมัติทุกหมวด: 12 รายการ จาก 30 หมวด"
+ */
+export function buildBulkMatchSummary(result: BulkMatchResult): string {
+  return `จับคู่อัตโนมัติทุกหมวด: ${result.totalMatched} รายการ จาก ${result.totalCategories} หมวด`
+}
+
+/**
  * Formats the undo success banner text.
  * e.g. "ย้อนแล้ว: 05 กลับเป็น 0100" or "ย้อนแล้ว: 05 กลับเป็น (ว่าง)"
  */

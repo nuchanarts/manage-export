@@ -15,6 +15,8 @@ import {
 } from '../../services/categoryRegistry'
 import { mapHeaderRowToFields, normalizeCellValue } from '../../services/excelMappingIO'
 import { recordMappingChange, getAudit, getLastChange, resolveAuditField } from '../../services/auditService'
+import { autoMatchSuggestions } from '../../services/autoMatch'
+import type { AmRow, AmOption } from '../../services/autoMatch'
 
 // Backward-compatible body schema: at least one of std_code, std_code2, or extra must be present
 const bodySchema = z.object({
@@ -61,6 +63,126 @@ export function makeConfigRouter(
 
   router.get('/', (_req: Request, res: Response) => {
     res.json(list())
+  })
+
+  // ── POST /_auto-match-all — bulk auto-match across ALL non-pending categories (F5) ──
+  // Registered BEFORE /:category to avoid the literal path being swallowed as a param.
+  router.post('/_auto-match-all', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actor = req.header('x-actor') || 'auto-match'
+      const reg = registryName ?? 'basic'
+      const categories = list()
+
+      let totalMatched = 0
+      const results: {
+        category: string
+        label: string
+        matched: number
+        unmatched: number
+        skippedPending?: boolean
+      }[] = []
+      const errors: { category: string; error: string }[] = []
+
+      for (const cat of categories) {
+        // Skip pending categories entirely — never read or write
+        if (cat.pending) {
+          results.push({ category: cat.key, label: cat.label, matched: 0, unmatched: 0, skippedPending: true })
+          continue
+        }
+
+        const c = get(cat.key)
+        if (!c) continue  // shouldn't happen; guard anyway
+
+        try {
+          // Fetch rows and primary std options
+          const { rows: rawRows } = await query(buildListSql(c))
+          const { rows: rawOpts } = await query(buildStdOptionsSql(c))
+
+          // Cast to AmRow/AmOption shapes
+          const rows: AmRow[] = (rawRows as { code: string; name: string; std_code: string | null; mapped: number | boolean }[])
+            .map(r => ({
+              code: String(r.code),
+              name: String(r.name ?? ''),
+              std_code: (r.std_code as string | null) ?? null,
+              mapped: !!r.mapped && r.std_code != null && r.std_code !== '',
+            }))
+          const options: AmOption[] = (rawOpts as { code: string; name: string }[])
+            .map(o => ({ code: String(o.code), name: String(o.name ?? '') }))
+
+          const suggestions = autoMatchSuggestions(rows, options)
+
+          let matched = 0
+          for (const suggestion of suggestions) {
+            try {
+              // Read current value for audit (best-effort)
+              let oldValue: string | null = null
+              try {
+                const { sql: selSql } = buildSelectCurrentSql(c, 'std_code')
+                const { rows: selRows } = await query(selSql, [suggestion.code])
+                oldValue = ((selRows as { current_val: string | null }[])[0]?.current_val) ?? null
+              } catch { /* best-effort */ }
+
+              // Skip no-op (old === new)
+              const normOld = oldValue === '' ? null : oldValue
+              const normNew = suggestion.std_code === '' ? null : suggestion.std_code
+              if (normOld === normNew) continue
+
+              // Apply the update
+              const { sql: updSql, params: updParams } = buildUpdateSql(c, suggestion.code, suggestion.std_code)
+              await query(updSql, updParams)
+              matched++
+              totalMatched++
+
+              // Best-effort audit
+              try {
+                await recordMappingChange({
+                  registry: reg,
+                  category: cat.key,
+                  code: suggestion.code,
+                  field: 'std_code',
+                  oldValue,
+                  newValue: suggestion.std_code === '' ? null : suggestion.std_code,
+                  actor,
+                })
+              } catch { /* best-effort */ }
+
+            } catch (suggErr) {
+              // Individual suggestion failure → collect and continue
+              errors.push({
+                category: cat.key,
+                error: `รหัส ${suggestion.code}: ${suggErr instanceof Error ? suggErr.message : String(suggErr)}`,
+              })
+            }
+          }
+
+          // Count still-unmapped after applying suggestions
+          const appliedCodes = new Set(suggestions.map(s => s.code))
+          const unmatched = rows.filter(r => {
+            const wasUnmapped = !r.mapped || r.std_code == null || r.std_code === ''
+            if (!wasUnmapped) return false
+            // If it was suggested, it's now mapped (best-effort count)
+            return !appliedCodes.has(r.code)
+          }).length
+
+          results.push({ category: cat.key, label: cat.label, matched, unmatched })
+
+        } catch (catErr) {
+          // Category-level failure → log + continue; mark in errors
+          const errMsg = catErr instanceof Error ? catErr.message : String(catErr)
+          console.error(`[auto-match-all] category ${cat.key} failed:`, errMsg)
+          errors.push({ category: cat.key, error: errMsg })
+          results.push({ category: cat.key, label: cat.label, matched: 0, unmatched: 0 })
+        }
+      }
+
+      const nonPendingCount = categories.filter(c => !c.pending).length
+      res.json({
+        totalCategories: nonPendingCount,
+        totalMatched,
+        results,
+        errors,
+      })
+    } catch (err) { next(err) }
   })
 
   router.get('/:category', async (req: Request, res: Response, next: NextFunction) => {
