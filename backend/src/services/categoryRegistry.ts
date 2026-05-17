@@ -129,57 +129,57 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     stdTable: 'pp_special_code', stdCodeCol: 'code', stdNameCol: 'name',
     pending: false },
 
-  // ── PENDING (pending: true) — mapCol===pk or data/join unconfirmable ───────
-  // icd101(code PK, name) -> provis_chronic_icd10(icd10, name_thai): mapCol would be code===pk; master table corrected from dbicd10chronic to icd101 per owner
+  // ── PENDING (pending: true) — mapCol===pk or generic builders cannot express mapping ──
+  // icd101(code PK, name): code IS the icd10 code; no other export/nhso col on master → mapCol===pk [verified 2026-05-17; code3/4/5 are ICD helpers, unrelated]
   { key: 'chronic-disease', label: 'โรคเรื้อรัง',
     table: 'icd101', pk: 'code', nameCol: 'name', mapCol: 'code',
     stdTable: 'provis_chronic_icd10', stdCodeCol: 'icd10', stdNameCol: 'name_thai',
     pending: true },
-  // clinic(clinic PK, name) — no separate mapCol to nhso_clinic.code; clinic code IS pk
+  // clinic(clinic PK, name): clinic code IS pk; no separate nhso/export/std col exists on master [verified 2026-05-17; depcode/oldcode/sss_clinic_code unrelated to nhso_clinic.code]
   { key: 'clinic', label: 'คลินิก',
     table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'clinic',
     stdTable: 'nhso_clinic', stdCodeCol: 'code', stdNameCol: 'name',
     pending: true },
-  // drugitems(icode PK, name, tmt_tp_code) -> drugitems_register(std_code, drugname): no plain single-name col in std (needs CONCAT); tmt_tp_code is real separate col
+  // drugitems(icode PK, name, tmt_tp_code) -> tmt_tp_code(tp_code, tp_name): tmt_tp_code separate from pk icode; JOIN verified (1 live row) [verified 2026-05-17; std corrected from drugitems_register to tmt_tp_code]
   { key: 'drug-list', label: 'รายการยา',
     table: 'drugitems', pk: 'icode', nameCol: 'name', mapCol: 'tmt_tp_code',
-    stdTable: 'drugitems_register', stdCodeCol: 'std_code', stdNameCol: 'drugname',
-    pending: true },
-  // drugitems_ned_reason_list is itself the std reference (self-map); no external std table
+    stdTable: 'tmt_tp_code', stdCodeCol: 'tp_code', stdNameCol: 'tp_name',
+    pending: false },
+  // drugitems_ned_reason_list: no external std table; claim_control IS pk; only 4 cols (doctor_reason, claim_control, hos_guid, hos_guid_ext) [verified 2026-05-17; self-referential]
   { key: 'drug-ned-reason', label: 'เหตุผลการสั่งยา',
     table: 'drugitems_ned_reason_list', pk: 'claim_control', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
     pending: true },
-  // diagtype(diagtype PK, name, nhso_code) -> provis_diagtype(code, name): nhso_code col exists but is NULL for all rows in demo
+  // diagtype(diagtype PK, name, nhso_code) -> provis_diagtype(code, name): nhso_code col distinct from pk; schema valid; NULL in demo but operator populates [verified 2026-05-17]
   { key: 'diagnosis-type', label: 'ประเภทการวินิจฉัย',
     table: 'diagtype', pk: 'diagtype', nameCol: 'name', mapCol: 'nhso_code',
     stdTable: 'provis_diagtype', stdCodeCol: 'code', stdNameCol: 'name',
-    pending: true },
-  // pcode(code PK, name) -> no separate mapCol; provis_person is per-person export table (not a code reference)
+    pending: false },
+  // pcode(code PK, name): only cols are code, name, age_min, age_max — no separate export col; provis_person is per-person export, not a code ref [verified 2026-05-17; mapCol===pk]
   { key: 'person-type', label: 'ประเภทบุคคล',
     table: 'pcode', pk: 'code', nameCol: 'name', mapCol: 'code',
     stdTable: 'provis_person', stdCodeCol: 'typearea', stdNameCol: 'name',
     pending: true },
-  // accident_place_type(accident_place_type_id PK, accident_place_type_name, export_code) -> provis_aeplace(code, name): export_code col exists but is NULL for all rows in demo
+  // accident_place_type(accident_place_type_id PK, accident_place_type_name, export_code) -> provis_aeplace(code, name): export_code col distinct from pk; schema valid; NULL in demo [verified 2026-05-17]
   { key: 'accident-place', label: 'สถานที่เกิดอุบัติเหตุ',
     table: 'accident_place_type', pk: 'accident_place_type_id', nameCol: 'accident_place_type_name', mapCol: 'export_code',
     stdTable: 'provis_aeplace', stdCodeCol: 'code', stdNameCol: 'name',
-    pending: true },
-  // accident_transport_type(accident_transport_type_id PK, accident_transport_type_name, export_code) -> provis_vehicle(code, name): export_code col exists but is NULL for all rows in demo
+    pending: false },
+  // accident_transport_type(accident_transport_type_id PK, accident_transport_type_name, export_code) -> provis_vehicle(code, name): export_code col distinct from pk; schema valid; NULL in demo [verified 2026-05-17]
   { key: 'vehicle-type', label: 'ประเภทยานพาหนะที่เกิดเหตุ',
     table: 'accident_transport_type', pk: 'accident_transport_type_id', nameCol: 'accident_transport_type_name', mapCol: 'export_code',
     stdTable: 'provis_vehicle', stdCodeCol: 'code', stdNameCol: 'name',
-    pending: true },
-  // ovstist(ovstist UNI-code, name, export_code) -> provis_typein(code, name): export_code col exists but is NULL for all rows in demo; note: DB PK is 'name' field (schema quirk), ovstist used as functional code pk
+    pending: false },
+  // ovstist(ovstist functional PK, name, export_code) -> provis_typein(code, name): export_code col distinct from pk ovstist; schema valid; NULL in demo [verified 2026-05-17]
   { key: 'service-entry', label: 'ประเภทการมารับบริการ',
     table: 'ovstist', pk: 'ovstist', nameCol: 'name', mapCol: 'export_code',
     stdTable: 'provis_typein', stdCodeCol: 'code', stdNameCol: 'name',
-    pending: true },
-  // lab_items(lab_items_code PK, lab_items_name, provis_labcode) -> provis_lab(provis_labcode, name_thai): JOIN returns empty (no provis_labcode populated in demo)
+    pending: false },
+  // lab_items(lab_items_code PK, lab_items_name, provis_labcode) -> provis_lab(provis_labcode, name_thai): provis_labcode col distinct from pk; schema valid; NULL in demo (operator populates) [verified 2026-05-17]
   { key: 'lab-value-map', label: 'Lab Value Map',
     table: 'lab_items', pk: 'lab_items_code', nameCol: 'lab_items_name', mapCol: 'provis_labcode',
     stdTable: 'provis_lab', stdCodeCol: 'provis_labcode', stdNameCol: 'name_thai',
-    pending: true },
+    pending: false },
 ]
 
 export function getCategory(key: string): CategoryDef | undefined {
