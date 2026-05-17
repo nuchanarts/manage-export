@@ -627,9 +627,77 @@ export function ValidatePage() {
   const [report, setReport] = useState<ValidationReport | null>(() => getValidateSession().report)
   const [selectedFile, setSelectedFile] = useState<FileResult | null>(null)
   const [fileName, setFileName] = useState<string | null>(() => getValidateSession().fileName)
+  const [exportingErrors, setExportingErrors] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const folderRef = useRef<HTMLInputElement>(null)
+
+  const handleExportErrorsExcel = async () => {
+    if (!report) return
+    setExportingErrors(true)
+    try {
+      const resp = await fetch('/api/validate-export/errors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(report),
+      })
+      if (!resp.ok) {
+        const json = await resp.json().catch(() => ({}))
+        setError((json as { message?: string }).message ?? 'ส่งออก Excel ไม่สำเร็จ')
+        return
+      }
+      const blob = await resp.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      a.download = `validation_errors_${date}.xlsx`
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('ส่งออก Excel ไม่สำเร็จ')
+    } finally {
+      setExportingErrors(false)
+    }
+  }
+
+  const handlePrintErrorSummary = () => {
+    if (!report) return
+    const w = window.open('', '_blank')
+    if (!w) return
+    const rows = report.files.map((f, i) => `
+      <tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
+        <td>${f.fileName}</td>
+        <td>${f.fileMeta?.fileType ?? ''}</td>
+        <td style="text-align:right">${f.totalRows.toLocaleString()}</td>
+        <td style="text-align:right;color:#15803d">${f.passPersons.toLocaleString()}</td>
+        <td style="text-align:right;color:#dc2626">${f.failPersons.toLocaleString()}</td>
+        <td style="text-align:right;color:${f.passPercent < 100 ? '#d97706' : '#15803d'}">${f.totalRows > 0 ? f.passPercent.toFixed(2) + '%' : '–'}</td>
+        <td style="color:#dc2626">${f.missingColumns.length > 0 ? f.missingColumns.join(', ') : ''}</td>
+        <td>${[...new Set(f.errors.map(e => e.field))].slice(0, 5).join(', ')}</td>
+      </tr>`).join('')
+    w.document.write(`<html><head><title>สรุป Error รายแฟ้ม — ${report.hospcode}</title>
+      <style>
+        body{font-family:sans-serif;font-size:11px;margin:16px}
+        h2{color:#1e3a8a;margin-bottom:4px}
+        p.meta{color:#6b7280;font-size:10px;margin-bottom:12px}
+        table{border-collapse:collapse;width:100%}
+        th{background:#1d4ed8;color:#fff;padding:4px 8px;text-align:left;font-size:11px}
+        td{border:1px solid #e5e7eb;padding:3px 8px}
+        @media print{body{margin:8px}}
+      </style></head>
+      <body>
+        <h2>สรุป Error รายแฟ้ม — 43 แฟ้มมาตรฐาน</h2>
+        <p class="meta">HOSPCODE: ${report.hospcode} | วันที่: ${new Date(report.generatedAt).toLocaleString('th-TH')} | แฟ้มทั้งหมด: ${report.totalFiles} | ไม่ผ่าน: ${report.failCount}</p>
+        <table>
+          <thead><tr>
+            <th>FileName</th><th>ลักษณะแฟ้ม</th><th>Record</th><th>ผ่าน</th><th>ไม่ผ่าน</th><th>ร้อยละ</th><th>คอลัมน์ขาด</th><th>ปัญหาหลัก</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body></html>`)
+    w.document.close(); w.print()
+  }
 
   const submitToServer = async (form: FormData, label: string) => {
     setError(null); setReport(null); setLoading(true); setFileName(label)
@@ -746,6 +814,21 @@ export function ValidatePage() {
               <div>
                 <span className="font-bold text-gray-800">ผลการตรวจสอบ 43 แฟ้ม</span>
                 <span className="ml-3 text-xs text-gray-400">HOSPCODE: {report.hospcode} | {new Date(report.generatedAt).toLocaleString('th-TH')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrintErrorSummary}
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition-colors"
+                >
+                  🖨 พิมพ์สรุป Error
+                </button>
+                <button
+                  onClick={handleExportErrorsExcel}
+                  disabled={exportingErrors}
+                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-medium rounded transition-colors"
+                >
+                  {exportingErrors ? '...' : '⬇ ส่งออก Excel (สรุป Error)'}
+                </button>
               </div>
             </div>
             <div className="grid grid-cols-4 gap-2 mt-3">

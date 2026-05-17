@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import recordsRouter from './records'
 import validateRouter from './validate'
+import validateExportRouter from './validateExport'
 import basicConfigRouter from './basicConfig'
 import eclaimConfigRouter from './eclaimConfig'
 import presenceRouter from './presence'
@@ -16,6 +17,7 @@ router.get('/health', (_req: Request, res: Response) => {
 router.use('/auth', authRouter)
 router.use('/records', recordsRouter)
 router.use('/validate', validateRouter)
+router.use('/validate-export', validateExportRouter)
 router.use('/basic-config', basicConfigRouter)
 router.use('/eclaim-config', eclaimConfigRouter)
 router.use('/presence', presenceRouter)
