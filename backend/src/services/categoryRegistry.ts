@@ -126,9 +126,10 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     stdTable: 'provis_urgency', stdCodeCol: 'code', stdNameCol: 'name',
     pending: false },
   // physic_items(physic_items_id PK, name, f43_rehab_code) -> provis_rehabcode(code, name)  [cols verified 2026-05-17; provis_rehabcode empty in demo but schema is valid]
+  // std from bgs_rehab_std (seeded from MoPH 43-file รหัสกายภาพ.xls, 197 codes via scripts/seedRehabStd.cjs) [owner-specified 2026-05-17]
   { key: 'rehab-code', label: 'รหัสบริการฟื้นฟู',
     table: 'physic_items', pk: 'physic_items_id', nameCol: 'name', mapCol: 'f43_rehab_code',
-    stdTable: 'provis_rehabcode', stdCodeCol: 'code', stdNameCol: 'name',
+    stdTable: 'bgs_rehab_std', stdCodeCol: 'code', stdNameCol: 'name',
     pending: false },
   // pp_special_type(pp_special_type_id PK, pp_special_type_name, pp_special_code) -> pp_special_code(code, name)  [JOIN verified 2026-05-17]
   { key: 'pp-special-code', label: 'รหัสบริการส่งเสริมป้องกันเฉพาะ',

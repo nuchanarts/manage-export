@@ -1,0 +1,790 @@
+[
+{
+"code": "5501421",
+"name": "Intermittent traction, cervical"
+},
+{
+"code": "5501422",
+"name": "Static traction, cervical"
+},
+{
+"code": "5521421",
+"name": "Intermittent traction, lumbar"
+},
+{
+"code": "5521422",
+"name": "Static traction, lumber"
+},
+{
+"code": "5849651",
+"name": "Back school training"
+},
+{
+"code": "6001711",
+"name": "การพันตอแขนที่ขาดด้วยผ้ายืด Stump bandaging, upper extremity"
+},
+{
+"code": "6001712",
+"name": "Pneumatic compression (e.g. Jobst), upper extremity"
+},
+{
+"code": "6001713",
+"name": "Elastic stocking, upper extremity"
+},
+{
+"code": "7269652",
+"name": "Hand function training"
+},
+{
+"code": "7311711",
+"name": "Stump bandaging, lower extremity"
+},
+{
+"code": "7311712",
+"name": "Pneumatic compression (e.g. Jobst), lower extremity"
+},
+{
+"code": "7311713",
+"name": "Elastic stocking, lower extremity"
+},
+{
+"code": "9000010",
+"name": "Medical Rehabilitation assessment and evaluation"
+},
+{
+"code": "9000011",
+"name": "Impairment and Disability assessment and evaluation"
+},
+{
+"code": "9000012",
+"name": "Functional activity assessment and evaluation"
+},
+{
+"code": "9000013",
+"name": "Neurodevelopmental assessment and evaluation"
+},
+{
+"code": "9000015",
+"name": "Musculoskeletal assessment and evaluation"
+},
+{
+"code": "9000016",
+"name": "Cardiac and pulmonary rehabilitation assessment and  evaluation"
+},
+{
+"code": "9000017",
+"name": "Communication and Speech assessment and evaluation"
+},
+{
+"code": "9000021",
+"name": "Assessment of body structure and function for prosthetic and orthotic prescription"
+},
+{
+"code": "9000022",
+"name": "Psychosocial assessment and evaluation"
+},
+{
+"code": "9000023",
+"name": "Prevocational and vocational assessment and evaluation"
+},
+{
+"code": "9000029",
+"name": "Rehabilitation assessment and evaluation, unspecified"
+},
+{
+"code": "9000030",
+"name": "Medical rehabilitation certification, for disablement by  rehabilitation act"
+},
+{
+"code": "9000031",
+"name": "Medical rehabilitation certification, for impairment by other laws"
+},
+{
+"code": "9000039",
+"name": "Medical certification, unspecified"
+},
+{
+"code": "9000202",
+"name": "Exercise stress test"
+},
+{
+"code": "9000203",
+"name": "Aerobic fitness capacity standard methods"
+},
+{
+"code": "9000204",
+"name": "Aerobic fitness capacity alternative methods (submaximum or indirect exercise testing)"
+},
+{
+"code": "9000205",
+"name": "Anaerobic fitness capacity"
+},
+{
+"code": "9000206",
+"name": "Muscle strength testing using special sport equipment"
+},
+{
+"code": "9000207",
+"name": "Muscle strength testing using isokinetic machine"
+},
+{
+"code": "9000208",
+"name": "Muscle power testing using special sport equipment"
+},
+{
+"code": "9000209",
+"name": "Flexibility testing"
+},
+{
+"code": "9000210",
+"name": "Response time testing"
+},
+{
+"code": "9000211",
+"name": "Biodynamic analysis"
+},
+{
+"code": "9000212",
+"name": "Gait analysis using observation"
+},
+{
+"code": "9000213",
+"name": "Gait analysis using motion analysis"
+},
+{
+"code": "9000214",
+"name": "Lung vital capacity"
+},
+{
+"code": "9000215",
+"name": "Body composition measurement"
+},
+{
+"code": "9000216",
+"name": "Anthropometric measurement"
+},
+{
+"code": "9000299",
+"name": "Physical test, using other devices or techniques, unspecified"
+},
+{
+"code": "9001001",
+"name": "Acupuncture with electrical stimulation"
+},
+{
+"code": "9001002",
+"name": "Acupuncture without electrical stimulation"
+},
+{
+"code": "9001003",
+"name": "Acupuncture with moxibustion"
+},
+{
+"code": "9001004",
+"name": "Acupuncture using cupping"
+},
+{
+"code": "9001499",
+"name": "Immobilize or traction device, unspecified"
+},
+{
+"code": "9001500",
+"name": "Massage, at any site and whole body"
+},
+{
+"code": "9001501",
+"name": "Acupressure at any site and whole body"
+},
+{
+"code": "9001799",
+"name": "Soft tissue stretching unspecified site"
+},
+{
+"code": "9005601",
+"name": "Muscle stretching unspecified site"
+},
+{
+"code": "9005602",
+"name": "Muscle stretching with coolant spray unspecified site"
+},
+{
+"code": "9005603",
+"name": "Tendon stretching unspecified site"
+},
+{
+"code": "9005604",
+"name": "Joint manipulation/play unspecified site"
+},
+{
+"code": "9005605",
+"name": "Hydroculator (Hot pack)"
+},
+{
+"code": "9005606",
+"name": "Paraffin wax bath"
+},
+{
+"code": "9005607",
+"name": "Laser therapy"
+},
+{
+"code": "9005608",
+"name": "UV lamp therapy"
+},
+{
+"code": "9005609",
+"name": "Infrared lamp therapy"
+},
+{
+"code": "9005699",
+"name": "Hyperthermic therapy at local region, unspecific device"
+},
+{
+"code": "9005701",
+"name": "Cold pack therapy"
+},
+{
+"code": "9005709",
+"name": "Cryotherapy, using unspecific device"
+},
+{
+"code": "9005911",
+"name": "Whirlpool therapy"
+},
+{
+"code": "9005912",
+"name": "Hubbard tank therapy"
+},
+{
+"code": "9005913",
+"name": "Contrast bath therapy"
+},
+{
+"code": "9005919",
+"name": "Hydrotherapy, unspecific device"
+},
+{
+"code": "9005985",
+"name": "Music therapy"
+},
+{
+"code": "9005986",
+"name": "Recreational therapy"
+},
+{
+"code": "9009501",
+"name": "Medical rehabilitation counseling"
+},
+{
+"code": "9009502",
+"name": "Impairment and Disability counseling"
+},
+{
+"code": "9009503",
+"name": "Functional activity counseling"
+},
+{
+"code": "9009504",
+"name": "Neurodevelopmental counseling and education"
+},
+{
+"code": "9009505",
+"name": "Neuromuscular counseling and education"
+},
+{
+"code": "9009506",
+"name": "Musculoskeletal pain counseling and education"
+},
+{
+"code": "9009507",
+"name": "Cardiac and pulmonary rehabilitation counseling and education"
+},
+{
+"code": "9009508",
+"name": "Communication and speech counseling and education"
+},
+{
+"code": "9009509",
+"name": "Psychological counseling"
+},
+{
+"code": "9009510",
+"name": "Prosthetic and orthotic counseling and education"
+},
+{
+"code": "9009511",
+"name": "Social worker counseling"
+},
+{
+"code": "9009512",
+"name": "Prevocational and vocational counseling"
+},
+{
+"code": "9009513",
+"name": "Care-giver counseling and education"
+},
+{
+"code": "9009514",
+"name": "Recreational therapy counseling and education"
+},
+{
+"code": "9009515",
+"name": "Protective behavior counseling and education"
+},
+{
+"code": "9009599",
+"name": "Rehabilitation counseling and education, unspecified"
+},
+{
+"code": "9009681",
+"name": "Activity of Daily Living (ADL) training"
+},
+{
+"code": "9009682",
+"name": "Prevocational training"
+},
+{
+"code": "9009683",
+"name": "Vocational rehabilitation training"
+},
+{
+"code": "9009684",
+"name": "Home management training"
+},
+{
+"code": "9009699",
+"name": "Rehabilitative training, unspecified"
+},
+{
+"code": "9009701",
+"name": "Home and environmental adaptation"
+},
+{
+"code": "9009702",
+"name": "Home visit for rehabilitative care"
+},
+{
+"code": "9011714",
+"name": "Skin pressure garment (scar treatment)"
+},
+{
+"code": "9021503",
+"name": "Soft tissue stretching unspecified site"
+},
+{
+"code": "9021504",
+"name": "Muscle stretching unspecified site"
+},
+{
+"code": "9021505",
+"name": "Muscle stretching with coolant spray unspecified site"
+},
+{
+"code": "9021506",
+"name": "Tendon stretching unspecified site"
+},
+{
+"code": "9021507",
+"name": "Joint manipulation/play unspecified site"
+},
+{
+"code": "9028100",
+"name": "Nerve and motor point block at nerve branches supply to unspecified muscles, using therapeutic agent"
+},
+{
+"code": "9028101",
+"name": "Botulinum toxin injection"
+},
+{
+"code": "9028102",
+"name": "Trigger point release, using therapeutic agents injection, at unspecified muscles"
+},
+{
+"code": "9028103",
+"name": "Trigger point release, using dry needle, at unspecified muscles"
+},
+{
+"code": "9028198",
+"name": "Local injection with therapeutic substance in soft tissue"
+},
+{
+"code": "9138100",
+"name": "Local injection with therapeutic substance into joint"
+},
+{
+"code": "9219611",
+"name": "Cardiac rehabilitation for inpatient care"
+},
+{
+"code": "9219612",
+"name": "Cardiac rehabilitation for outpatient care"
+},
+{
+"code": "9219613",
+"name": "Cardiac rehabilitation using EKG Telemetry Monitoring"
+},
+{
+"code": "9232201",
+"name": "Postural drainage for respiratory system without percussion or vibration technique"
+},
+{
+"code": "9232202",
+"name": "Postural drainage for respiratory system with percussion technique"
+},
+{
+"code": "9232203",
+"name": "Postural drainage for respiratory system with vibration technique"
+},
+{
+"code": "9232204",
+"name": "Sustained maximum inspiration using incentive spirometer"
+},
+{
+"code": "9239621",
+"name": "Pulmonary rehabilitation for inpatient"
+},
+{
+"code": "9239622",
+"name": "Pulmonary rehabilitation for outpatient"
+},
+{
+"code": "9239623",
+"name": "Breathing exercise training for respiratory problems"
+},
+{
+"code": "9279601",
+"name": "Oral-motor stimulation and training"
+},
+{
+"code": "9279602",
+"name": "Swallowing training"
+},
+{
+"code": "9289603",
+"name": "Bowel training"
+},
+{
+"code": "9289604",
+"name": "Bladder training"
+},
+{
+"code": "9289605",
+"name": "Pelvic floor training"
+},
+{
+"code": "9330000",
+"name": "Neurological assessment and evaluation"
+},
+{
+"code": "9330200",
+"name": "Musculoskeletal assessment and evaluation"
+},
+{
+"code": "9330201",
+"name": "Cardiac and pulmonary rehabilitation assessment and  evaluation"
+},
+{
+"code": "9330202",
+"name": "Communication and Speech assessment and evaluation"
+},
+{
+"code": "9330203",
+"name": "Repetitive nerve stimulation [Decrement test]"
+},
+{
+"code": "9330204",
+"name": "Needle electromyography 1-3 muscles"
+},
+{
+"code": "9330205",
+"name": "Needle electromyography 4-7 muscles"
+},
+{
+"code": "9330206",
+"name": "Needle electromyography > 7 muscles"
+},
+{
+"code": "9330210",
+"name": "Quantitative electromyography"
+},
+{
+"code": "9330211",
+"name": "Single fiber electromyography"
+},
+{
+"code": "9330212",
+"name": "Somatosensory evoked potentials"
+},
+{
+"code": "9330213",
+"name": "Intraoperative somatosensory evoked potential"
+},
+{
+"code": "9330214",
+"name": "Brain stem auditory evoked potentials [Auditory evoked  responses]"
+},
+{
+"code": "9330215",
+"name": "Autonomic responses [tests]"
+},
+{
+"code": "9330216",
+"name": "Visual evoked potentials"
+},
+{
+"code": "9330220",
+"name": "Motor evoked potentials using electrical stimulation"
+},
+{
+"code": "9330221",
+"name": "Motor evoked potentials using magnetic stimulation at  peripheral nerves"
+},
+{
+"code": "9330222",
+"name": "Motor evoked potentials using magnetic stimulation at spinal  cord"
+},
+{
+"code": "9330223",
+"name": "Motor evoked potentials using magnetic stimulation at brain  skin"
+},
+{
+"code": "9330224",
+"name": "Sensory testing using special equipment"
+},
+{
+"code": "9330299",
+"name": "Neurophysiologic or Electrodiagnostic tests, unspecified"
+},
+{
+"code": "9330207",
+"name": "Electromyography, using surface electrodes"
+},
+{
+"code": "9349641",
+"name": "Neuro-developmental training"
+},
+{
+"code": "9349642",
+"name": "Perception and cognitive training"
+},
+{
+"code": "9349643",
+"name": "Coordination training"
+},
+{
+"code": "9349644",
+"name": "Dyslexia training"
+},
+{
+"code": "9359645",
+"name": "Sensory and motor training"
+},
+{
+"code": "9359646",
+"name": "Sensory integration training"
+},
+{
+"code": "9371600",
+"name": "Orthotic fitting"
+},
+{
+"code": "9371610",
+"name": "Prosthetic fitting for non-functional or cosmetic purpose"
+},
+{
+"code": "9371620",
+"name": "Prosthetic fitting, mechanical control"
+},
+{
+"code": "9371621",
+"name": "Prosthetic fitting, using electronic power and/or computerized control"
+},
+{
+"code": "9371630",
+"name": "Assistive device prescription and fitting"
+},
+{
+"code": "9371631",
+"name": "Mobility aids prescription and fitting"
+},
+{
+"code": "9371699",
+"name": "Other functional device prescription and fitting, unspecified"
+},
+{
+"code": "9375811",
+"name": "Passive range of motion (PROM) exercise"
+},
+{
+"code": "9375812",
+"name": "Passive range of motion exercise, using PNF or other special techniques"
+},
+{
+"code": "9375813",
+"name": "Passive range of motion exercise, using continuous PROM machine (Continuous Passive Motion)"
+},
+{
+"code": "9375814",
+"name": "Passive stretching, manual"
+},
+{
+"code": "9375815",
+"name": "Active assisted ROM exercise"
+},
+{
+"code": "9375816",
+"name": "Active assisted ROM exercise, using PNF technique"
+},
+{
+"code": "9375817",
+"name": "Generalized conditioning exercise using equipments"
+},
+{
+"code": "9375818",
+"name": "Generalized conditioning exercise not using equipments"
+},
+{
+"code": "9375819",
+"name": "Resistive/strengthening, using isometric exercise"
+},
+{
+"code": "9375820",
+"name": "Resistive/strengthening, using isotonic exercise"
+},
+{
+"code": "9375821",
+"name": "Resistive/strengthening, using isokinetic machine"
+},
+{
+"code": "9375822",
+"name": "Exercise for Aerobic capacity, using treadmill"
+},
+{
+"code": "9375823",
+"name": "Exercise for Aerobic capacity, using ergometer device"
+},
+{
+"code": "9375824",
+"name": "Exercise for Aerobic capacity, using others or unspecified"
+},
+{
+"code": "9375825",
+"name": "Aquatic/water and pool exercise"
+},
+{
+"code": "9375899",
+"name": "Other therapeutic exercises, unclassified"
+},
+{
+"code": "9375911",
+"name": "Electrical stimulation (ES) to retard muscle atrophy at unspecified site"
+},
+{
+"code": "9375912",
+"name": "Electrical stimulation (ES), using Interferential ES device at unspecified site"
+},
+{
+"code": "9375913",
+"name": "Transcutaneous electrical nerve stimulation (TENS)"
+},
+{
+"code": "9375914",
+"name": "Electrical stimulation (ES) for iontophoresis"
+},
+{
+"code": "9375915",
+"name": "Functional electrical stimulation (FES)"
+},
+{
+"code": "9375916",
+"name": "Pudendal nerve stimulation"
+},
+{
+"code": "9375917",
+"name": "Intravesical electrical stimulation"
+},
+{
+"code": "9375999",
+"name": "Other electrical stimulation (ES) device, unspecified"
+},
+{
+"code": "9379653",
+"name": "Biofeedback training"
+},
+{
+"code": "9379654",
+"name": "Ambulation, transfer and gait training, general mobility"
+},
+{
+"code": "9379655",
+"name": "Ambulation, transfer, wheelchair mobility"
+},
+{
+"code": "9379656",
+"name": "Ambulation, transfer and gait training, on parallel bar"
+},
+{
+"code": "9379657",
+"name": "Ambulation, transfer and gait training, using gait aids or assistive devices"
+},
+{
+"code": "9379658",
+"name": "Ambulation, transfer and gait training, not using gait aids or assistive devices"
+},
+{
+"code": "9379659",
+"name": "Ambulation, transfer and gait training, LE prosthetic training"
+},
+{
+"code": "9379660",
+"name": "Orthotic training, upper extremity"
+},
+{
+"code": "9379661",
+"name": "Orthotic training, lower extremity"
+},
+{
+"code": "9379662",
+"name": "Prosthetic training, upper extremity"
+},
+{
+"code": "9379663",
+"name": "Prosthetic training, lower extremity"
+},
+{
+"code": "9379664",
+"name": "Adaptive device training"
+},
+{
+"code": "9381710",
+"name": "Strapping and taping"
+},
+{
+"code": "9409671",
+"name": "Auditory training"
+},
+{
+"code": "9409672",
+"name": "Speech defect training"
+},
+{
+"code": "9409673",
+"name": "Esophageal speech training"
+},
+{
+"code": "9409674",
+"name": "Breathing exercise training for speech therapy"
+},
+{
+"code": "9409675",
+"name": "Language defects training (dysphasia, dysarthria, etc.)"
+},
+{
+"code": "9409676",
+"name": "Language training in visual disorders"
+},
+{
+"code": "9409679",
+"name": "Other speech and language training and therapy, unspecified"
+}
+]
