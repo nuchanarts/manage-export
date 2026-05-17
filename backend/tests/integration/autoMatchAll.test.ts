@@ -184,18 +184,22 @@ describe('POST /api/basic-config/_auto-match-all — basic flow', () => {
 
 describe('POST /api/basic-config/_auto-match-all — pending categories skipped', () => {
   it('does not issue any query for pending categories', async () => {
-    // All categories in basic-config are pending:false currently.
-    // We test that the route respects the pending flag:
-    // If we could inject a pending category we would verify no UPDATE is called.
-    // Instead, we verify the overall response shape is correct and no error occurs.
+    // drug-ned-reason is now pending:true (read-only national NED reference list, owner decision 2026-05-17).
+    // The route skips pending categories (skippedPending:true in results) and excludes them from totalCategories.
+    // results array includes ALL categories (including pending ones as skipped entries);
+    // totalCategories counts only non-pending categories.
     mockQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 
     const res = await request(app).post('/api/basic-config/_auto-match-all')
     expect(res.status).toBe(200)
-    // results should not include any entry with skippedPending
-    // (since all basic-config categories are non-pending currently)
-    // Just assert the results array has entries for all non-pending categories
-    expect(res.body.results.length).toBe(res.body.totalCategories)
+    // results includes pending entries with skippedPending:true
+    const skippedPending = res.body.results.filter((r: { skippedPending?: boolean }) => r.skippedPending === true)
+    expect(skippedPending.length).toBeGreaterThanOrEqual(1)
+    // drug-ned-reason must appear as skipped
+    const nedEntry = skippedPending.find((r: { category: string }) => r.category === 'drug-ned-reason')
+    expect(nedEntry).toBeDefined()
+    // totalCategories counts only non-pending categories; results.length >= totalCategories
+    expect(res.body.results.length).toBeGreaterThanOrEqual(res.body.totalCategories)
   })
 })
 

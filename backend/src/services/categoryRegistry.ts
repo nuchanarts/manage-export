@@ -221,13 +221,13 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     stdTable: 'drugitems_register', stdCodeCol: 'std_code', stdNameCol: 'drugname',
     pending: false,
     stdRule: { pattern: '^[0-9A-Za-z]{24}$', message: 'รหัสยา 24 หลัก ต้องมี 24 ตัวอักษร/ตัวเลข' } },
-  // drugitems_ned_reason_list(doctor_reason PK, claim_control mapCol) — 4 cols only: doctor_reason, claim_control, hos_guid, hos_guid_ext
-  // WHERE is on doctor_reason (row identity); writable column is claim_control (distinct NED code) — safe to edit, no PK overwrite
-  // [verified 2026-05-17; self-referential std table for code lookup is intentional]
+  // drugitems_ned_reason_list(doctor_reason PK, claim_control mapCol) — fixed national NED reference list (EA–EF), read-only by design (owner decision 2026-05-17).
+  // pending:true blocks all writes via the pending-guard (400 PENDING_CATEGORY); buildListSql still runs so the list displays read-only in the UI (amber dot).
+  // Editing via the Thai `doctor_reason` key caused audit garbling + accidental wipes — must NOT be hospital-editable.
   { key: 'drug-ned-reason', label: 'เหตุผลการสั่งยา NED',
     table: 'drugitems_ned_reason_list', pk: 'doctor_reason', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
-    pending: false, hideCodeCol: true },
+    pending: true, hideCodeCol: true },
   // diagtype(diagtype PK, name, nhso_code) -> provis_diagtype(code, name): nhso_code col distinct from pk; schema valid; NULL in demo but operator populates [verified 2026-05-17]
   { key: 'diagnosis-type', label: 'ประเภทการวินิจฉัย',
     table: 'diagtype', pk: 'diagtype', nameCol: 'name', mapCol: 'nhso_code',

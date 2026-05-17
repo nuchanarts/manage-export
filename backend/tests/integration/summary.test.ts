@@ -83,10 +83,14 @@ describe('GET /api/basic-config/_summary', () => {
     const res = await request(app).get('/api/basic-config/_summary')
     expect(res.status).toBe(200)
 
-    // None of the basic-config categories are pending (all pending:false in the registry).
-    // Verify no category has pending:true in the current registry.
+    // drug-ned-reason is pending:true (read-only national NED reference list, owner decision 2026-05-17).
+    // The summary includes it with pending:true and no counts (no DB query issued for pending categories).
     const pendingCats = res.body.categories.filter((c: { pending: boolean }) => c.pending === true)
-    expect(pendingCats.length).toBe(0)
+    expect(pendingCats.length).toBeGreaterThanOrEqual(1)
+    const nedReason = res.body.categories.find((c: { key: string }) => c.key === 'drug-ned-reason')
+    expect(nedReason).toBeTruthy()
+    expect(nedReason.pending).toBe(true)
+    expect(nedReason.total).toBeUndefined()
 
     // Verify non-pending categories get counts (they may be 0 rows if mock returns empty)
     const occ = res.body.categories.find((c: { key: string }) => c.key === 'occupation')

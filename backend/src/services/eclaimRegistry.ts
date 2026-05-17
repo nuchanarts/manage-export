@@ -73,13 +73,13 @@ export const ECLAIM_REGISTRY: CategoryDef[] = [
     field1Label: 'ประเภทโรค', field2Label: 'ประเภทกิจกรรม',
     pending: false },
 
-  // aligned with 43-file drug-ned-reason
-  // drugitems_ned_reason_list(doctor_reason PK, claim_control mapCol) — WHERE on doctor_reason; writable is claim_control (NED code)
-  // [verified 2026-05-17; self-referential std table intentional; pk=doctor_reason so no PK overwrite]
+  // aligned with 43-file drug-ned-reason — fixed national NED reference list (EA–EF), read-only by design (owner decision 2026-05-17).
+  // pending:true blocks all writes via the pending-guard (400 PENDING_CATEGORY); buildListSql still runs so the list displays read-only in the UI (amber dot).
+  // Editing via the Thai `doctor_reason` key caused audit garbling + accidental wipes — must NOT be hospital-editable.
   { key: 'eclaim-drug-ned', label: 'เหตุผลการสั่งยา NED',
     table: 'drugitems_ned_reason_list', pk: 'doctor_reason', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
-    pending: false, hideCodeCol: true },
+    pending: true, hideCodeCol: true },
 ]
 
 export function getEclaimCategory(key: string): CategoryDef | undefined {

@@ -44,11 +44,10 @@ describe('eclaim-config routes', () => {
     expect(res.status).toBe(404)
   })
 
-  it('PUT to unknown eclaim category → 404 (pending-guard: eclaim-drug-ned is now editable; no pending entries remain)', async () => {
-    // After Task 1, eclaim-drug-ned is now pending:false (pk=doctor_reason, mapCol=claim_control, aligned with 43-file drug-ned-reason).
-    // No pending categories remain in ECLAIM_REGISTRY.
-    // The pending-guard logic still exists in configRouterFactory (if (c.pending) throw 400 PENDING_CATEGORY).
-    // We verify guard path is intact by confirming unknown key → 404 NOT_FOUND (guard would fire first for any pending key).
+  it('PUT to unknown eclaim category → 404 (pending-guard active; eclaim-drug-ned is now pending:true — read-only national NED list)', async () => {
+    // eclaim-drug-ned is pending:true (read-only by design, owner decision 2026-05-17).
+    // The pending-guard in configRouterFactory fires 400 PENDING_CATEGORY for pending keys.
+    // An unknown key still produces 404 NOT_FOUND (guard fires after registry lookup for known keys).
     const res = await request(app)
       .put('/api/eclaim-config/totally-unknown-eclaim-key/EA')
       .send({ std_code: 'EA' })
@@ -235,24 +234,19 @@ describe('eclaim-config routes', () => {
     expect(updateCall[1][1]).toBe('CLI01')
   })
 
-  // ── eclaim-drug-ned free-text PUT tests ───────────────────────────────────
+  // ── eclaim-drug-ned read-only guard tests ────────────────────────────────────
+  // eclaim-drug-ned is pending:true (fixed national NED reference list, read-only by design, owner decision 2026-05-17).
+  // All writes must be rejected with 400 PENDING_CATEGORY; no DB calls must be made.
 
-  it('PUT /api/eclaim-config/eclaim-drug-ned/:code with free-text std_code updates claim_control', async () => {
+  it('PUT /api/eclaim-config/eclaim-drug-ned/:code is rejected 400 PENDING_CATEGORY (read-only national NED list)', async () => {
     const doctorReason = encodeURIComponent('ไม่มียาในบัญชียา')
-    mockQuery
-      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ไม่มียาในบัญชียา' }], rowCount: 1 }) // exists
-      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 })                   // select-current
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                                         // update
-      .mockResolvedValue({ rows: [], rowCount: 0 })                                             // ensure + audit INSERT
     const res = await request(app)
       .put(`/api/eclaim-config/eclaim-drug-ned/${doctorReason}`)
       .send({ std_code: 'EZ' })
-    expect(res.status).toBe(200)
-    expect(res.body).toEqual({ ok: true })
-    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
-    const updateCall = mockQuery.mock.calls[2]
-    expect(updateCall[0]).toContain('UPDATE `drugitems_ned_reason_list` SET `claim_control` = ?')
-    expect(updateCall[1]).toEqual(['EZ', 'ไม่มียาในบัญชียา'])
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('PENDING_CATEGORY')
+    // pending-guard fires before any DB call
+    expect(mockQuery).not.toHaveBeenCalled()
   })
 
   it('listEclaimCategories exposes hideCodeCol:true for eclaim-drug-ned', async () => {

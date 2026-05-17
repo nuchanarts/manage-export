@@ -89,19 +89,20 @@ describe('eclaimRegistry — integrity', () => {
     expect(new Set(keys).size).toBe(keys.length)
   })
 
-  it('pending entries have mapCol === pk (self-referential guard) — vacuously true after Task 1 made eclaim-drug-ned editable', () => {
-    // After Task 1: eclaim-drug-ned moved to pending:false (pk=doctor_reason, mapCol=claim_control).
-    // No pending entries remain in ECLAIM_REGISTRY; the loop is vacuously true.
-    // The invariant is documented: if any new pending entry is added it must have mapCol === pk.
+  it('pending entries are the known read-only national reference entries (eclaim-drug-ned)', () => {
+    // eclaim-drug-ned is pending:true (read-only national NED reference list, owner decision 2026-05-17).
+    // pending:true means read-only by design; the pending-guard blocks all writes (400 PENDING_CATEGORY).
+    // Note: for this category mapCol (claim_control) !== pk (doctor_reason) — distinct cols are valid for display;
+    // the read-only guarantee comes from the guard, not the mapCol===pk invariant.
     const pendingEntries = ECLAIM_REGISTRY.filter(c => c.pending)
-    for (const c of pendingEntries) {
-      expect(c.mapCol).toBe(c.pk)
-    }
+    expect(pendingEntries.length).toBeGreaterThanOrEqual(1)
+    const pendingKeys = pendingEntries.map(c => c.key)
+    expect(pendingKeys).toContain('eclaim-drug-ned')
   })
 
   it('non-pending entries have mapCol !== pk (safe to update)', () => {
-    // All entries are now non-pending; each must have mapCol distinct from pk.
-    // eclaim-drug-ned: pk=doctor_reason, mapCol=claim_control (distinct) — safe to update.
+    // Non-pending entries (all except eclaim-drug-ned) must have mapCol distinct from pk.
+    // eclaim-drug-ned is excluded (pending:true — read-only by design).
     const confirmed = ECLAIM_REGISTRY.filter(c => !c.pending)
     for (const c of confirmed) {
       expect(c.mapCol).not.toBe(c.pk)

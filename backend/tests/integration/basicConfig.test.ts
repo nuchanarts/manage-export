@@ -47,12 +47,10 @@ describe('basic-config routes', () => {
     expect(res.status).toBe(400)
   })
 
-  it('PUT to unknown category → 404 (pending-guard: no pending categories remain in basic-config registry after drug-ned-reason was made editable)', async () => {
-    // After Task 1, drug-ned-reason is now pending:false (pk=doctor_reason, mapCol=claim_control).
-    // No pending categories remain in categoryRegistry.
-    // The pending-guard logic still exists in configRouterFactory (line: if (c.pending) throw 400 PENDING_CATEGORY).
-    // We verify the guard is still there indirectly: an unknown key produces 404 NOT_FOUND,
-    // and the guard would fire first if a pending key were present.
+  it('PUT to unknown category → 404 (pending-guard still active; drug-ned-reason is now pending:true — read-only national NED list)', async () => {
+    // drug-ned-reason is pending:true (read-only by design, owner decision 2026-05-17).
+    // The pending-guard in configRouterFactory fires 400 PENDING_CATEGORY for pending keys.
+    // An unknown key still produces 404 NOT_FOUND (guard fires after registry lookup for known keys).
     const res = await request(app).put('/api/basic-config/totally-unknown-key/001').send({ std_code: '001' })
     expect(res.status).toBe(404)
     expect(res.body.error).toBe('NOT_FOUND')
@@ -110,42 +108,30 @@ describe('basic-config routes', () => {
     expect(mockQuery).not.toHaveBeenCalled()
   })
 
-  // ── drug-ned-reason free-text PUT tests ───────────────────────────────────
+  // ── drug-ned-reason read-only guard tests ───────────────────────────────────
+  // drug-ned-reason is pending:true (fixed national NED reference list, read-only by design, owner decision 2026-05-17).
+  // All writes must be rejected with 400 PENDING_CATEGORY; no DB calls must be made.
 
-  it('PUT /api/basic-config/drug-ned-reason/:code with free-text std_code updates claim_control', async () => {
+  it('PUT /api/basic-config/drug-ned-reason/:code is rejected 400 PENDING_CATEGORY (read-only national NED list)', async () => {
     const doctorReason = encodeURIComponent('ไม่มียาในบัญชียา')
-    mockQuery
-      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ไม่มียาในบัญชียา' }], rowCount: 1 }) // exists
-      .mockResolvedValueOnce({ rows: [{ current_val: null }], rowCount: 1 })                   // select-current
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                                         // update
-      .mockResolvedValue({ rows: [], rowCount: 0 })                                             // ensure + audit INSERT
     const res = await request(app)
       .put(`/api/basic-config/drug-ned-reason/${doctorReason}`)
       .send({ std_code: 'EZ' })
-    expect(res.status).toBe(200)
-    expect(res.body).toEqual({ ok: true })
-    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
-    const updateCall = mockQuery.mock.calls[2]
-    expect(updateCall[0]).toContain('UPDATE `drugitems_ned_reason_list` SET `claim_control` = ?')
-    expect(updateCall[1]).toEqual(['EZ', 'ไม่มียาในบัญชียา'])
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('PENDING_CATEGORY')
+    // pending-guard fires before any DB call
+    expect(mockQuery).not.toHaveBeenCalled()
   })
 
-  it('PUT /api/basic-config/drug-ned-reason/:code with std_code="" clears to null', async () => {
+  it('PUT /api/basic-config/drug-ned-reason/:code with std_code="" also rejected 400 PENDING_CATEGORY', async () => {
     const doctorReason = encodeURIComponent('ยาราคาแพง')
-    mockQuery
-      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ยาราคาแพง' }], rowCount: 1 }) // exists
-      .mockResolvedValueOnce({ rows: [{ current_val: 'OLD' }], rowCount: 1 })          // select-current
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                                 // update
-      .mockResolvedValue({ rows: [], rowCount: 0 })                                     // ensure + audit INSERT
     const res = await request(app)
       .put(`/api/basic-config/drug-ned-reason/${doctorReason}`)
       .send({ std_code: '' })
-    expect(res.status).toBe(200)
-    // calls[0]=exists, calls[1]=select-current, calls[2]=UPDATE
-    const updateCall = mockQuery.mock.calls[2]
-    expect(updateCall[0]).toContain('UPDATE `drugitems_ned_reason_list` SET `claim_control` = ?')
-    expect(updateCall[1][0]).toBeNull()
-    expect(updateCall[1][1]).toBe('ยาราคาแพง')
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('PENDING_CATEGORY')
+    // pending-guard fires before any DB call
+    expect(mockQuery).not.toHaveBeenCalled()
   })
 
   // ── hideCodeCol flag tests ─────────────────────────────────────────────────
