@@ -27,6 +27,8 @@ export interface CategoryDef {
   field2Label?: string    // UI column header for secondary mapping
   // ── Optional N additional free-value or std-reference columns ────────────
   extraFields?: ExtraFieldDef[]
+  // ── Optional UI flags (additive; default falsey → backward-compatible) ───
+  hideCodeCol?: boolean   // true = hide the "รหัส" column in UI (e.g. when pk === nameCol)
 }
 
 // Confirmed against the live HOSxP `demo` schema probe (2026-05-16/17).
@@ -173,7 +175,7 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
   { key: 'drug-ned-reason', label: 'เหตุผลการสั่งยา NED',
     table: 'drugitems_ned_reason_list', pk: 'doctor_reason', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
-    pending: false },
+    pending: false, hideCodeCol: true },
   // diagtype(diagtype PK, name, nhso_code) -> provis_diagtype(code, name): nhso_code col distinct from pk; schema valid; NULL in demo but operator populates [verified 2026-05-17]
   { key: 'diagnosis-type', label: 'ประเภทการวินิจฉัย',
     table: 'diagtype', pk: 'diagtype', nameCol: 'name', mapCol: 'nhso_code',
@@ -218,10 +220,11 @@ export interface CategoryListItem {
   field1Label?: string
   field2Label?: string
   extraFields?: ExtraFieldMeta[]  // additive; absent when no extraFields
+  hideCodeCol?: boolean           // additive; absent (falsey) when not set
 }
 
 export function listCategories(): CategoryListItem[] {
-  return CATEGORY_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields }) => ({
+  return CATEGORY_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields, hideCodeCol }) => ({
     key,
     label,
     pending,
@@ -231,6 +234,7 @@ export function listCategories(): CategoryListItem[] {
     ...(extraFields && extraFields.length > 0
       ? { extraFields: extraFields.map(ef => ({ label: ef.label, hasOptions: !!(ef.stdTable && ef.stdCodeCol && ef.stdNameCol) })) }
       : {}),
+    ...(hideCodeCol ? { hideCodeCol: true } : {}),
   }))
 }
 

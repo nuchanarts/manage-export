@@ -25,6 +25,7 @@ interface MenuItem {
   field1Label?: string
   field2Label?: string
   extraFields?: ExtraFieldMeta[]  // additive: present only for N-field categories
+  hideCodeCol?: boolean           // additive: true = hide "รหัส" column (e.g. when pk === nameCol)
 }
 
 // ─── StdCombobox ─────────────────────────────────────────────────────────────
@@ -199,6 +200,7 @@ function DataTable({
   apiBase: string
 }) {
   const isDual = !!menu.dual
+  const hideCodeCol = !!menu.hideCodeCol
   const extraFields = menu.extraFields ?? []
   const hasExtra = extraFields.length > 0
   const qc = useQueryClient()
@@ -398,7 +400,7 @@ function DataTable({
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm table-fixed">
           <colgroup>
-            <col style={{ width: colWidths.code }} />
+            {!hideCodeCol && <col style={{ width: colWidths.code }} />}
             <col style={{ width: colWidths.name }} />
             <col style={{ width: colWidths.std_code }} />
             {isDual && <col style={{ width: colWidths.std_code2 }} />}
@@ -409,16 +411,18 @@ function DataTable({
           <thead className="bg-blue-700 text-white">
             <tr>
               {/* Each <th> has a right-edge drag handle; the handle stops propagation so sort still works on th click */}
-              <th
-                className="text-left px-3 py-2 font-medium cursor-pointer select-none relative"
-                onClick={() => handleSortClick('code')}
-              >
-                รหัส<span className="text-xs opacity-70">{sortIndicator('code')}</span>
-                <span
-                  className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-white/30"
-                  onMouseDown={e => startColResize('code', e)}
-                />
-              </th>
+              {!hideCodeCol && (
+                <th
+                  className="text-left px-3 py-2 font-medium cursor-pointer select-none relative"
+                  onClick={() => handleSortClick('code')}
+                >
+                  รหัส<span className="text-xs opacity-70">{sortIndicator('code')}</span>
+                  <span
+                    className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-white/30"
+                    onMouseDown={e => startColResize('code', e)}
+                  />
+                </th>
+              )}
               <th
                 className="text-left px-3 py-2 font-medium cursor-pointer select-none relative"
                 onClick={() => handleSortClick('name')}
@@ -469,10 +473,10 @@ function DataTable({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {displayedRows.length === 0 ? (
-              <tr><td colSpan={3 + (isDual ? 1 : 0) + extraFields.length} className="px-4 py-8 text-center text-gray-400">ไม่พบข้อมูล</td></tr>
+              <tr><td colSpan={(hideCodeCol ? 0 : 1) + 2 + (isDual ? 1 : 0) + extraFields.length} className="px-4 py-8 text-center text-gray-400">ไม่พบข้อมูล</td></tr>
             ) : displayedRows.map(row => (
               <tr key={row.code} className={isUnmapped(row) ? 'bg-red-50' : 'bg-white'}>
-                <td className="px-3 py-2 text-gray-700">{row.code}</td>
+                {!hideCodeCol && <td className="px-3 py-2 text-gray-700">{row.code}</td>}
                 <td className="px-3 py-2 text-gray-700">
                   {isUnmapped(row) && <span className="mr-1 text-red-500" title="ยังไม่ map">⚠</span>}
                   {row.name as string}

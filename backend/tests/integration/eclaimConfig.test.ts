@@ -179,4 +179,77 @@ describe('eclaim-config routes', () => {
       .send({ extra: { index: 99, value: 'X' } })
     expect(res.status).toBe(400)
   })
+
+  // ── Dual-field eclaim-clinic tests ────────────────────────────────────────
+
+  it('GET /api/eclaim-config/eclaim-clinic/std-options2 returns rows', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ code: '001', name: 'กิจกรรมหนึ่ง' }],
+      rowCount: 1,
+    })
+    const res = await request(app).get('/api/eclaim-config/eclaim-clinic/std-options2')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+  })
+
+  it('PUT /api/eclaim-config/eclaim-clinic/:code with {std_code2} updates oapp_activity_id', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 }) // existence check
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })                     // update
+    const res = await request(app)
+      .put('/api/eclaim-config/eclaim-clinic/CLI01')
+      .send({ std_code2: 'ACT42' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true })
+    const updateCall = mockQuery.mock.calls[1]
+    expect(updateCall[0]).toContain('UPDATE `clinic` SET `oapp_activity_id` = ?')
+    expect(updateCall[1]).toEqual(['ACT42', 'CLI01'])
+  })
+
+  it('PUT /api/eclaim-config/eclaim-clinic/:code with {std_code2:""} clears to null', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ clinic: 'CLI01' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    const res = await request(app)
+      .put('/api/eclaim-config/eclaim-clinic/CLI01')
+      .send({ std_code2: '' })
+    expect(res.status).toBe(200)
+    const updateCall = mockQuery.mock.calls[1]
+    expect(updateCall[0]).toContain('UPDATE `clinic` SET `oapp_activity_id` = ?')
+    expect(updateCall[1][0]).toBeNull()
+    expect(updateCall[1][1]).toBe('CLI01')
+  })
+
+  // ── eclaim-drug-ned free-text PUT tests ───────────────────────────────────
+
+  it('PUT /api/eclaim-config/eclaim-drug-ned/:code with free-text std_code updates claim_control', async () => {
+    const doctorReason = encodeURIComponent('ไม่มียาในบัญชียา')
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ไม่มียาในบัญชียา' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    const res = await request(app)
+      .put(`/api/eclaim-config/eclaim-drug-ned/${doctorReason}`)
+      .send({ std_code: 'EZ' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true })
+    const updateCall = mockQuery.mock.calls[1]
+    expect(updateCall[0]).toContain('UPDATE `drugitems_ned_reason_list` SET `claim_control` = ?')
+    expect(updateCall[1]).toEqual(['EZ', 'ไม่มียาในบัญชียา'])
+  })
+
+  it('listEclaimCategories exposes hideCodeCol:true for eclaim-drug-ned', async () => {
+    const res = await request(app).get('/api/eclaim-config')
+    expect(res.status).toBe(200)
+    const drugNed = res.body.find((c: { key: string }) => c.key === 'eclaim-drug-ned')
+    expect(drugNed).toBeDefined()
+    expect(drugNed.hideCodeCol).toBe(true)
+  })
+
+  it('listEclaimCategories does NOT expose hideCodeCol for eclaim-inscl (other category unchanged)', async () => {
+    const res = await request(app).get('/api/eclaim-config')
+    expect(res.status).toBe(200)
+    const inscl = res.body.find((c: { key: string }) => c.key === 'eclaim-inscl')
+    expect(inscl).toBeDefined()
+    expect(inscl.hideCodeCol).toBeFalsy()
+  })
 })

@@ -79,7 +79,7 @@ export const ECLAIM_REGISTRY: CategoryDef[] = [
   { key: 'eclaim-drug-ned', label: 'เหตุผลการสั่งยา NED',
     table: 'drugitems_ned_reason_list', pk: 'doctor_reason', nameCol: 'doctor_reason', mapCol: 'claim_control',
     stdTable: 'drugitems_ned_reason_list', stdCodeCol: 'claim_control', stdNameCol: 'doctor_reason',
-    pending: false },
+    pending: false, hideCodeCol: true },
 ]
 
 export function getEclaimCategory(key: string): CategoryDef | undefined {
@@ -87,7 +87,7 @@ export function getEclaimCategory(key: string): CategoryDef | undefined {
 }
 
 export function listEclaimCategories(): CategoryListItem[] {
-  return ECLAIM_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields }) => ({
+  return ECLAIM_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields, hideCodeCol }) => ({
     key,
     label,
     pending,
@@ -97,5 +97,6 @@ export function listEclaimCategories(): CategoryListItem[] {
     ...(extraFields && extraFields.length > 0
       ? { extraFields: extraFields.map((ef): ExtraFieldMeta => ({ label: ef.label, hasOptions: !!(ef.stdTable && ef.stdCodeCol && ef.stdNameCol) })) }
       : {}),
+    ...(hideCodeCol ? { hideCodeCol: true } : {}),
   }))
 }

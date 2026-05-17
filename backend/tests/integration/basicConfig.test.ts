@@ -103,4 +103,54 @@ describe('basic-config routes', () => {
     expect(res.status).toBe(400)
     expect(mockQuery).not.toHaveBeenCalled()
   })
+
+  // ── drug-ned-reason free-text PUT tests ───────────────────────────────────
+
+  it('PUT /api/basic-config/drug-ned-reason/:code with free-text std_code updates claim_control', async () => {
+    const doctorReason = encodeURIComponent('ไม่มียาในบัญชียา')
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ไม่มียาในบัญชียา' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    const res = await request(app)
+      .put(`/api/basic-config/drug-ned-reason/${doctorReason}`)
+      .send({ std_code: 'EZ' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true })
+    const updateCall = mockQuery.mock.calls[1]
+    expect(updateCall[0]).toContain('UPDATE `drugitems_ned_reason_list` SET `claim_control` = ?')
+    expect(updateCall[1]).toEqual(['EZ', 'ไม่มียาในบัญชียา'])
+  })
+
+  it('PUT /api/basic-config/drug-ned-reason/:code with std_code="" clears to null', async () => {
+    const doctorReason = encodeURIComponent('ยาราคาแพง')
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ doctor_reason: 'ยาราคาแพง' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    const res = await request(app)
+      .put(`/api/basic-config/drug-ned-reason/${doctorReason}`)
+      .send({ std_code: '' })
+    expect(res.status).toBe(200)
+    const updateCall = mockQuery.mock.calls[1]
+    expect(updateCall[0]).toContain('UPDATE `drugitems_ned_reason_list` SET `claim_control` = ?')
+    expect(updateCall[1][0]).toBeNull()
+    expect(updateCall[1][1]).toBe('ยาราคาแพง')
+  })
+
+  // ── hideCodeCol flag tests ─────────────────────────────────────────────────
+
+  it('listCategories exposes hideCodeCol:true for drug-ned-reason', async () => {
+    const res = await request(app).get('/api/basic-config')
+    expect(res.status).toBe(200)
+    const nedReason = res.body.find((c: { key: string }) => c.key === 'drug-ned-reason')
+    expect(nedReason).toBeDefined()
+    expect(nedReason.hideCodeCol).toBe(true)
+  })
+
+  it('listCategories does NOT expose hideCodeCol for occupation (other category unchanged)', async () => {
+    const res = await request(app).get('/api/basic-config')
+    expect(res.status).toBe(200)
+    const occ = res.body.find((c: { key: string }) => c.key === 'occupation')
+    expect(occ).toBeDefined()
+    expect(occ.hideCodeCol).toBeFalsy()
+  })
 })

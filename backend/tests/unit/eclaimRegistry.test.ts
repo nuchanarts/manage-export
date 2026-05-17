@@ -108,3 +108,37 @@ describe('eclaimRegistry — integrity', () => {
     }
   })
 })
+
+describe('eclaimRegistry — hideCodeCol flag', () => {
+  it('getEclaimCategory("eclaim-drug-ned").hideCodeCol is true', () => {
+    const c = getEclaimCategory('eclaim-drug-ned')
+    expect(c).toBeDefined()
+    expect(c!.hideCodeCol).toBe(true)
+  })
+
+  it('getEclaimCategory("eclaim-inscl").hideCodeCol is falsy (not set)', () => {
+    const c = getEclaimCategory('eclaim-inscl')
+    expect(c).toBeDefined()
+    expect(c!.hideCodeCol).toBeFalsy()
+  })
+
+  it('only eclaim-drug-ned has hideCodeCol:true in ECLAIM_REGISTRY', () => {
+    const withHide = ECLAIM_REGISTRY.filter(c => c.hideCodeCol)
+    expect(withHide.length).toBe(1)
+    expect(withHide[0]!.key).toBe('eclaim-drug-ned')
+  })
+
+  it('listEclaimCategories exposes hideCodeCol:true for eclaim-drug-ned', () => {
+    const list = listEclaimCategories()
+    const entry = list.find(c => c.key === 'eclaim-drug-ned')!
+    expect(entry).toBeDefined()
+    expect(entry.hideCodeCol).toBe(true)
+  })
+
+  it('listEclaimCategories does NOT include hideCodeCol for eclaim-inscl (additive — falsy/absent)', () => {
+    const list = listEclaimCategories()
+    const entry = list.find(c => c.key === 'eclaim-inscl')!
+    expect(entry).toBeDefined()
+    expect(entry.hideCodeCol).toBeFalsy()
+  })
+})

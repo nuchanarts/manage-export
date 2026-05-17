@@ -357,3 +357,43 @@ describe('extraFields — registry integrity for extraFields', () => {
     }
   })
 })
+
+describe('hideCodeCol flag', () => {
+  it('getCategory("drug-ned-reason").hideCodeCol is true', () => {
+    const c = getCategory('drug-ned-reason')
+    expect(c).toBeDefined()
+    expect(c!.hideCodeCol).toBe(true)
+  })
+
+  it('getCategory("occupation").hideCodeCol is falsy (not set)', () => {
+    const c = getCategory('occupation')
+    expect(c).toBeDefined()
+    expect(c!.hideCodeCol).toBeFalsy()
+  })
+
+  it('getCategory("clinic").hideCodeCol is falsy (not set)', () => {
+    const c = getCategory('clinic')
+    expect(c).toBeDefined()
+    expect(c!.hideCodeCol).toBeFalsy()
+  })
+
+  it('listCategories exposes hideCodeCol:true for drug-ned-reason', () => {
+    const list = listCategories()
+    const entry = list.find(c => c.key === 'drug-ned-reason')!
+    expect(entry).toBeDefined()
+    expect(entry.hideCodeCol).toBe(true)
+  })
+
+  it('listCategories does NOT include hideCodeCol for occupation (additive — falsy/absent)', () => {
+    const list = listCategories()
+    const entry = list.find(c => c.key === 'occupation')!
+    expect(entry).toBeDefined()
+    expect(entry.hideCodeCol).toBeFalsy()
+  })
+
+  it('only drug-ned-reason has hideCodeCol:true in the entire CATEGORY_REGISTRY', () => {
+    const withHide = CATEGORY_REGISTRY.filter(c => c.hideCodeCol)
+    expect(withHide.length).toBe(1)
+    expect(withHide[0]!.key).toBe('drug-ned-reason')
+  })
+})
