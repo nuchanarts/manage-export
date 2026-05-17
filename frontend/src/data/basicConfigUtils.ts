@@ -1,7 +1,50 @@
+/**
+ * Optional validation rule for a std-code value (mirrors backend StdRule).
+ * Returned by GET / list endpoints in the category meta (F6).
+ */
+export interface StdRule {
+  pattern?: string   // RegExp pattern string to test against the value
+  minLen?: number    // minimum length (inclusive)
+  maxLen?: number    // maximum length (inclusive)
+  message: string    // Thai user-facing message shown when validation fails
+}
+
+/**
+ * Pure frontend mirror of the backend validateStdValue helper (F6).
+ * Returns {ok:true} when:
+ *   - rule is undefined (no rule configured), OR
+ *   - value is '' (empty = clearing the mapping; always allowed).
+ * Otherwise checks minLen, maxLen, pattern in sequence.
+ * A malformed pattern string is treated as a pass (never throws).
+ */
+export function validateStdValue(
+  rule: StdRule | undefined,
+  value: string,
+): { ok: boolean; message?: string } {
+  if (!rule) return { ok: true }
+  if (value === '') return { ok: true }
+  if (rule.minLen !== undefined && value.length < rule.minLen) {
+    return { ok: false, message: rule.message }
+  }
+  if (rule.maxLen !== undefined && value.length > rule.maxLen) {
+    return { ok: false, message: rule.message }
+  }
+  if (rule.pattern !== undefined) {
+    try {
+      const re = new RegExp(rule.pattern)
+      if (!re.test(value)) return { ok: false, message: rule.message }
+    } catch {
+      // Bad regex → treat as pass
+    }
+  }
+  return { ok: true }
+}
+
 /** Metadata for one extra editable column (returned by GET / list endpoint). */
 export interface ExtraFieldMeta {
   label: string
   hasOptions: boolean
+  rule?: StdRule  // additive (F6): optional validation rule for this extra field
 }
 
 export interface BasicRow {

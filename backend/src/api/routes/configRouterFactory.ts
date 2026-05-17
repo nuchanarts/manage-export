@@ -12,6 +12,7 @@ import {
   buildStdOptionsSql2, buildUpdateSql2,
   buildStdOptionsSqlExtra, buildUpdateSqlExtra,
   buildSelectCurrentSql,
+  validateStdValue,
 } from '../../services/categoryRegistry'
 import { mapHeaderRowToFields, normalizeCellValue } from '../../services/excelMappingIO'
 import { recordMappingChange, getAudit, getLastChange, resolveAuditField } from '../../services/auditService'
@@ -19,9 +20,10 @@ import { autoMatchSuggestions } from '../../services/autoMatch'
 import type { AmRow, AmOption } from '../../services/autoMatch'
 
 // Backward-compatible body schema: at least one of std_code, std_code2, or extra must be present
+// max(50) accommodates 24-char TMT drug codes and other longer standard codes.
 const bodySchema = z.object({
-  std_code:  z.string().max(20).optional(),
-  std_code2: z.string().max(20).optional(),
+  std_code:  z.string().max(50).optional(),
+  std_code2: z.string().max(50).optional(),
   extra: z.object({
     index: z.number().int().min(0),
     value: z.string().max(50),
@@ -446,6 +448,15 @@ export function makeConfigRouter(
 
           try {
             if (m.target.kind === 'std_code') {
+              // F6: validate primary std_code value (empty = clear = always allowed)
+              const vr = validateStdValue(c.stdRule, value)
+              if (!vr.ok) {
+                skipped++
+                if (errors.length < MAX_ERRORS) {
+                  errors.push(`แถว ${rowNumber}, รหัส ${code}: ${vr.message}`)
+                }
+                continue
+              }
               // Read current value for audit
               let oldValue: string | null = null
               if (registryName) {
@@ -486,6 +497,16 @@ export function makeConfigRouter(
             } else if (m.target.kind === 'extra') {
               const { index } = m.target
               if (!c.extraFields || index >= c.extraFields.length) continue
+              // F6: validate extra field value (empty = clear = always allowed)
+              const extraRule = c.extraFields[index]?.rule
+              const evr = validateStdValue(extraRule, value)
+              if (!evr.ok) {
+                skipped++
+                if (errors.length < MAX_ERRORS) {
+                  errors.push(`แถว ${rowNumber}, รหัส ${code}: ${evr.message}`)
+                }
+                continue
+              }
               const fieldKey = `std_code_e${index}` as `std_code_e${number}`
               let oldValue: string | null = null
               if (registryName) {
@@ -534,6 +555,12 @@ export function makeConfigRouter(
         const { index, value } = parsed.data.extra
         if (!c.extraFields || index < 0 || index >= c.extraFields.length) {
           throw new AppError(400, 'INVALID_EXTRA_INDEX', `ไม่พบ extraField index ${index} สำหรับหมวด ${category}`)
+        }
+        // F6: validate extra field value against its rule (if any)
+        const extraRule = c.extraFields[index]?.rule
+        const extraValidation = validateStdValue(extraRule, value)
+        if (!extraValidation.ok) {
+          throw new AppError(400, 'INVALID_CODE', extraValidation.message!)
         }
         const exists = await query(buildExistsSql(c), [code])
         if (exists.rowCount === 0) throw new AppError(404, 'NOT_FOUND', `ไม่พบรหัส: ${code}`)
@@ -594,6 +621,11 @@ export function makeConfigRouter(
       }
 
       // std_code path: primary field update (existing behaviour)
+      // F6: validate primary std_code value against stdRule (if any)
+      const primaryValidation = validateStdValue(c.stdRule, parsed.data.std_code!)
+      if (!primaryValidation.ok) {
+        throw new AppError(400, 'INVALID_CODE', primaryValidation.message!)
+      }
       const exists = await query(buildExistsSql(c), [code])
       if (exists.rowCount === 0) throw new AppError(404, 'NOT_FOUND', `ไม่พบรหัส: ${code}`)
 

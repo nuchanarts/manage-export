@@ -12,8 +12,10 @@ import {
   buildImportSummary,
   formatRevertBanner,
   buildBulkMatchSummary,
+  validateStdValue,
   BasicRow,
   StdOption,
+  StdRule,
   ExtraFieldMeta,
   BulkMatchResult,
   SortKey,
@@ -30,6 +32,7 @@ interface MenuItem {
   field2Label?: string
   extraFields?: ExtraFieldMeta[]  // additive: present only for N-field categories
   hideCodeCol?: boolean           // additive: true = hide "รหัส" column (e.g. when pk === nameCol)
+  stdRule?: StdRule               // additive (F6): optional validation rule for primary std_code
 }
 
 // ─── StdCombobox ─────────────────────────────────────────────────────────────
@@ -238,10 +241,17 @@ function DataTable({
       enabled: hasExtra,
     })
   )
+  const [saveErrMsg, setSaveErrMsg] = useState<string | null>(null)
   const save = useMutation({
     mutationFn: (v: { code: string; std_code: string }) =>
       axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { std_code: v.std_code }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [apiBase, menu.key] }),
+    onSuccess: () => { setSaveErrMsg(null); qc.invalidateQueries({ queryKey: [apiBase, menu.key] }) },
+    onError: (err) => {
+      // F6: surface server-side INVALID_CODE message
+      if (axios.isAxiosError(err) && err.response?.data?.error === 'INVALID_CODE') {
+        setSaveErrMsg(err.response.data.message as string ?? 'รหัสไม่ถูกต้อง')
+      }
+    },
   })
   const save2 = useMutation({
     mutationFn: (v: { code: string; std_code2: string }) =>
@@ -253,6 +263,19 @@ function DataTable({
       axios.put(`${apiBase}/${menu.key}/${encodeURIComponent(v.code)}`, { extra: { index: v.index, value: v.value } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: [apiBase, menu.key] }),
   })
+
+  // ── F6: per-cell validation error state ─────────────────────────────────────
+  // Key format: "<rowCode>:primary" | "<rowCode>:extra:<i>"
+  const [validationErrors, setValidationErrors] = useState<Map<string, string>>(new Map())
+
+  function setValidationError(key: string, msg: string | null) {
+    setValidationErrors(prev => {
+      const next = new Map(prev)
+      if (msg === null) next.delete(key)
+      else next.set(key, msg)
+      return next
+    })
+  }
 
   // ── Undo mutation (F2) ──
   const [undoMsg, setUndoMsg] = useState<string | null>(null)
@@ -625,11 +648,27 @@ function DataTable({
                   {menu.pending ? (
                     <span className="text-gray-500">{(row.std_code as string) ?? '—'}</span>
                   ) : (
-                    <StdCombobox
-                      value={(row.std_code as string) ?? ''}
-                      options={opts}
-                      onChange={(std_code) => save.mutate({ code: row.code, std_code })}
-                    />
+                    <div>
+                      <StdCombobox
+                        value={(row.std_code as string) ?? ''}
+                        options={opts}
+                        onChange={(std_code) => {
+                          const errKey = `${row.code}:primary`
+                          const vr = validateStdValue(menu.stdRule, std_code)
+                          if (!vr.ok) {
+                            setValidationError(errKey, vr.message!)
+                            return  // do NOT call save mutation
+                          }
+                          setValidationError(errKey, null)
+                          save.mutate({ code: row.code, std_code })
+                        }}
+                      />
+                      {validationErrors.get(`${row.code}:primary`) && (
+                        <p className="text-xs text-red-600 mt-0.5" role="alert">
+                          {validationErrors.get(`${row.code}:primary`)}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </td>
                 {isDual && (
@@ -645,19 +684,35 @@ function DataTable({
                     )}
                   </td>
                 )}
-                {extraFields.map((_, i) => {
+                {extraFields.map((ef, i) => {
                   const val = ((row[`std_code_e${i}`] as string) ?? '')
                   const extraOpts = extraOptsQueries[i]?.data ?? []
+                  const extraErrKey = `${row.code}:extra:${i}`
                   return (
                     <td key={`etd-${i}`} className="px-3 py-2">
                       {menu.pending ? (
                         <span className="text-gray-500">{val || '—'}</span>
                       ) : (
-                        <StdCombobox
-                          value={val}
-                          options={extraOpts}
-                          onChange={(value) => saveExtra.mutate({ code: row.code, index: i, value })}
-                        />
+                        <div>
+                          <StdCombobox
+                            value={val}
+                            options={extraOpts}
+                            onChange={(value) => {
+                              const vr = validateStdValue(ef.rule, value)
+                              if (!vr.ok) {
+                                setValidationError(extraErrKey, vr.message!)
+                                return  // do NOT call saveExtra mutation
+                              }
+                              setValidationError(extraErrKey, null)
+                              saveExtra.mutate({ code: row.code, index: i, value })
+                            }}
+                          />
+                          {validationErrors.get(extraErrKey) && (
+                            <p className="text-xs text-red-600 mt-0.5" role="alert">
+                              {validationErrors.get(extraErrKey)}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </td>
                   )
@@ -667,7 +722,11 @@ function DataTable({
           </tbody>
         </table>
       </div>
-      {save.isError && <div className="px-4 py-2 text-sm text-red-700 bg-red-50">บันทึกไม่สำเร็จ</div>}
+      {save.isError && (
+        <div className="px-4 py-2 text-sm text-red-700 bg-red-50">
+          {saveErrMsg ?? 'บันทึกไม่สำเร็จ'}
+        </div>
+      )}
       {save.isSuccess && <div className="px-4 py-2 text-sm text-green-700 bg-green-50">บันทึกแล้ว</div>}
 
       {/* Bulk auto-match result panel (F5) */}

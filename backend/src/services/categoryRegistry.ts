@@ -1,3 +1,46 @@
+/**
+ * Optional validation rule for a std-code value.
+ * All checks are permissive: empty value always bypasses (clearing is allowed).
+ */
+export interface StdRule {
+  pattern?: string   // RegExp pattern string tested against the value (anchor with ^…$)
+  minLen?: number    // minimum length (inclusive)
+  maxLen?: number    // maximum length (inclusive)
+  message: string    // Thai user-facing message shown when validation fails
+}
+
+/**
+ * Pure validation helper — no side effects.
+ * Returns {ok:true} when:
+ *   - rule is undefined (no rule configured), OR
+ *   - value is '' (empty = clearing the mapping; always allowed).
+ * Otherwise checks minLen, maxLen, pattern in sequence.
+ * A malformed pattern string is treated as a pass (console.warn, never throw).
+ */
+export function validateStdValue(
+  rule: StdRule | undefined,
+  value: string,
+): { ok: boolean; message?: string } {
+  if (!rule) return { ok: true }
+  if (value === '') return { ok: true }
+  if (rule.minLen !== undefined && value.length < rule.minLen) {
+    return { ok: false, message: rule.message }
+  }
+  if (rule.maxLen !== undefined && value.length > rule.maxLen) {
+    return { ok: false, message: rule.message }
+  }
+  if (rule.pattern !== undefined) {
+    try {
+      const re = new RegExp(rule.pattern)
+      if (!re.test(value)) return { ok: false, message: rule.message }
+    } catch (err) {
+      // Bad regex in registry — treat as pass, warn defensively
+      console.warn(`validateStdValue: invalid pattern "${rule.pattern}":`, err)
+    }
+  }
+  return { ok: true }
+}
+
 /** One extra editable column beyond the primary (+optional secondary) mapping. */
 export interface ExtraFieldDef {
   mapCol: string        // writable column in `table` (must differ from pk and other mapCols)
@@ -5,6 +48,7 @@ export interface ExtraFieldDef {
   stdTable?: string     // optional std reference table; if omitted → free-value (no options)
   stdCodeCol?: string   // standard code column in stdTable
   stdNameCol?: string   // standard name column in stdTable
+  rule?: StdRule        // optional validation rule for this extra field's value
 }
 
 export interface CategoryDef {
@@ -29,6 +73,8 @@ export interface CategoryDef {
   extraFields?: ExtraFieldDef[]
   // ── Optional UI flags (additive; default falsey → backward-compatible) ───
   hideCodeCol?: boolean   // true = hide the "รหัส" column in UI (e.g. when pk === nameCol)
+  // ── Optional validation rule for the PRIMARY std_code field (F6) ─────────
+  stdRule?: StdRule       // validates the primary mapCol value before saving; empty always bypasses
 }
 
 // Confirmed against the live HOSxP `demo` schema probe (2026-05-16/17).
@@ -84,10 +130,12 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     stdTable: 'provis_typearea', stdCodeCol: 'code', stdNameCol: 'name',
     pending: false },
   // er_oper_code(er_oper_code PK, name, icd9cm) -> icd9cm1(code, name)  [owner-specified 2026-05-17; mapCol icd9cm distinct from pk; tables/cols probe-verified]
+  // stdRule: ICD-9-CM must be digits (with optional dot), min 2 chars (e.g. 93.01, 39.1, 88)
   { key: 'procedure', label: 'หัตถการ',
     table: 'er_oper_code', pk: 'er_oper_code', nameCol: 'name', mapCol: 'icd9cm',
     stdTable: 'icd9cm1', stdCodeCol: 'code', stdNameCol: 'name',
-    pending: false },
+    pending: false,
+    stdRule: { pattern: '^[0-9.]+$', minLen: 2, message: 'รหัส ICD-9-CM ควรเป็นตัวเลข (อาจมีจุด)' } },
   // women_birth_control(women_birth_control_id PK, women_birth_control_name, export_code) -> provis_fptype(code, name)  [JOIN verified 2026-05-17]
   { key: 'fp-method', label: 'การคุมกำเนิด',
     table: 'women_birth_control', pk: 'women_birth_control_id', nameCol: 'women_birth_control_name', mapCol: 'export_code',
@@ -152,10 +200,12 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
 
   // ── PENDING (pending: true) — mapCol===pk or generic builders cannot express mapping ──
   // clinic(clinic PK, name, icd10) -> icd101(code, name)  [owner-specified 2026-05-17: โรคเรื้อรัง = chronic clinics in `clinic`; std code from icd101; mapCol icd10 distinct from pk; cols probe-verified]
+  // stdRule: ICD-10 must start with a letter followed by a digit (e.g. E11, Z00, A00)
   { key: 'chronic-disease', label: 'โรคเรื้อรัง',
     table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'icd10',
     stdTable: 'icd101', stdCodeCol: 'code', stdNameCol: 'name',
-    pending: false },
+    pending: false,
+    stdRule: { pattern: '^[A-Za-z][0-9].*', message: 'รหัส ICD-10 ควรขึ้นต้นด้วยตัวอักษรตามด้วยตัวเลข' } },
   // clinic(clinic PK, name, icd10, oapp_activity_id) -> icd101(code, name) + oapp_activity(oapp_activity_id, oapp_activity_name)
   // [probe-verified 2026-05-17: mapCol icd10 distinct from pk; mapCol2 oapp_activity_id distinct from pk; both std tables confirmed]
   { key: 'clinic', label: 'คลินิก',
@@ -165,10 +215,12 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     field1Label: 'ประเภทโรค', field2Label: 'ประเภทกิจกรรม',
     pending: false },
   // drugitems(icode PK, name, did=24-digit std code) -> drugitems_register(std_code, drugname)  [owner-specified 2026-05-17: 24 หลัก = drugitems.did; did distinct from pk icode; ncd24 does NOT exist; std name is plain drugname (full CONCAT format not expressible by generic builder)]
+  // stdRule: TMT drug code must be exactly 24 alphanumeric characters
   { key: 'drug-list', label: 'รายการยา',
     table: 'drugitems', pk: 'icode', nameCol: 'name', mapCol: 'did',
     stdTable: 'drugitems_register', stdCodeCol: 'std_code', stdNameCol: 'drugname',
-    pending: false },
+    pending: false,
+    stdRule: { pattern: '^[0-9A-Za-z]{24}$', message: 'รหัสยา 24 หลัก ต้องมี 24 ตัวอักษร/ตัวเลข' } },
   // drugitems_ned_reason_list(doctor_reason PK, claim_control mapCol) — 4 cols only: doctor_reason, claim_control, hos_guid, hos_guid_ext
   // WHERE is on doctor_reason (row identity); writable column is claim_control (distinct NED code) — safe to edit, no PK overwrite
   // [verified 2026-05-17; self-referential std table for code lookup is intentional]
@@ -210,6 +262,7 @@ export function getCategory(key: string): CategoryDef | undefined {
 export interface ExtraFieldMeta {
   label: string
   hasOptions: boolean  // true = has stdTable, false = free-value
+  rule?: StdRule       // additive (F6): optional validation rule for this extra field
 }
 
 export interface CategoryListItem {
@@ -221,10 +274,11 @@ export interface CategoryListItem {
   field2Label?: string
   extraFields?: ExtraFieldMeta[]  // additive; absent when no extraFields
   hideCodeCol?: boolean           // additive; absent (falsey) when not set
+  stdRule?: StdRule               // additive (F6): optional rule for the primary std_code field
 }
 
 export function listCategories(): CategoryListItem[] {
-  return CATEGORY_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields, hideCodeCol }) => ({
+  return CATEGORY_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields, hideCodeCol, stdRule }) => ({
     key,
     label,
     pending,
@@ -232,9 +286,14 @@ export function listCategories(): CategoryListItem[] {
     ...(field1Label !== undefined ? { field1Label } : {}),
     ...(field2Label !== undefined ? { field2Label } : {}),
     ...(extraFields && extraFields.length > 0
-      ? { extraFields: extraFields.map(ef => ({ label: ef.label, hasOptions: !!(ef.stdTable && ef.stdCodeCol && ef.stdNameCol) })) }
+      ? { extraFields: extraFields.map(ef => ({
+          label: ef.label,
+          hasOptions: !!(ef.stdTable && ef.stdCodeCol && ef.stdNameCol),
+          ...(ef.rule !== undefined ? { rule: ef.rule } : {}),
+        })) }
       : {}),
     ...(hideCodeCol ? { hideCodeCol: true } : {}),
+    ...(stdRule !== undefined ? { stdRule } : {}),
   }))
 }
 

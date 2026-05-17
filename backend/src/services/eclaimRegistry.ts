@@ -87,7 +87,7 @@ export function getEclaimCategory(key: string): CategoryDef | undefined {
 }
 
 export function listEclaimCategories(): CategoryListItem[] {
-  return ECLAIM_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields, hideCodeCol }) => ({
+  return ECLAIM_REGISTRY.map(({ key, label, pending, mapCol2, field1Label, field2Label, extraFields, hideCodeCol, stdRule }) => ({
     key,
     label,
     pending,
@@ -95,8 +95,13 @@ export function listEclaimCategories(): CategoryListItem[] {
     ...(field1Label !== undefined ? { field1Label } : {}),
     ...(field2Label !== undefined ? { field2Label } : {}),
     ...(extraFields && extraFields.length > 0
-      ? { extraFields: extraFields.map((ef): ExtraFieldMeta => ({ label: ef.label, hasOptions: !!(ef.stdTable && ef.stdCodeCol && ef.stdNameCol) })) }
+      ? { extraFields: extraFields.map((ef): ExtraFieldMeta => ({
+          label: ef.label,
+          hasOptions: !!(ef.stdTable && ef.stdCodeCol && ef.stdNameCol),
+          ...(ef.rule !== undefined ? { rule: ef.rule } : {}),
+        })) }
       : {}),
     ...(hideCodeCol ? { hideCodeCol: true } : {}),
+    ...(stdRule !== undefined ? { stdRule } : {}),
   }))
 }
