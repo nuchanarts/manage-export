@@ -11,6 +11,8 @@ import { GlobalSearchPage } from './pages/GlobalSearchPage'
 import { THEMES, getStoredTheme, storeTheme } from './theme/theme'
 import { getOrCreateClientId } from './utils/clientId'
 import { onNavigate } from './data/appNav'
+import { LoginPage } from './pages/LoginPage'
+import { getAuth, clearAuth, initAxiosAuth } from './data/auth'
 
 type MenuKey = 'dashboard' | 'validate' | 'basic-config' | 'eclaim-config' | 'drug-catalog' | 'nhso-links' | 'help' | 'knowledge' | 'global-search'
 
@@ -188,6 +190,45 @@ export function App() {
   // so ConfigCatalog can pre-select the right category.
   const [pendingCategory, setPendingCategory] = useState<string | null>(null)
 
+  // F9: auth state — null means "haven't checked yet"; false means "no login needed"
+  const [authEnabled, setAuthEnabled] = useState<boolean | null>(null)
+  const [authUser, setAuthUser] = useState<string | null>(null)
+  const [authRole, setAuthRole] = useState<string | null>(null)
+
+  // On mount: initialise axios header from stored token, then check /auth/status
+  useEffect(() => {
+    initAxiosAuth(window.localStorage)
+    const stored = getAuth(window.localStorage)
+    if (stored) {
+      setAuthUser(stored.u)
+      setAuthRole(stored.role)
+    }
+
+    fetch('/api/auth/status')
+      .then(r => r.ok ? (r.json() as Promise<{ enabled: boolean }>) : Promise.resolve({ enabled: false }))
+      .then(data => {
+        setAuthEnabled(data.enabled)
+      })
+      .catch(() => {
+        // Cannot reach server — treat as disabled to not block the UI
+        setAuthEnabled(false)
+      })
+  }, [])
+
+  function handleLoginSuccess() {
+    const stored = getAuth(window.localStorage)
+    if (stored) {
+      setAuthUser(stored.u)
+      setAuthRole(stored.role)
+    }
+  }
+
+  function handleLogout() {
+    clearAuth(window.localStorage)
+    setAuthUser(null)
+    setAuthRole(null)
+  }
+
   // Subscribe to navigation requests from ValidatePage deep-link buttons.
   useEffect(() => {
     const unsub = onNavigate(r => {
@@ -263,6 +304,11 @@ export function App() {
   const allItems = NAV.flatMap(n => n.children ?? [n])
   const currentLabel = allItems.find(m => m.key === activeMenu)?.label ?? ''
 
+  // F9: auth gate — show login when enabled and no user logged in yet
+  if (authEnabled === true && !authUser) {
+    return <LoginPage onSuccess={handleLoginSuccess} />
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <header className="app-header text-white shadow-md z-10">
@@ -285,6 +331,20 @@ export function App() {
           >
             🟢 {online} ออนไลน์
           </span>
+
+          {/* F9: logged-in user badge + logout button */}
+          {authUser && (
+            <span className="bg-white/15 text-white text-xs rounded px-2 py-1 shrink-0 flex items-center gap-1.5">
+              <span>{authUser} ({authRole})</span>
+              <button
+                onClick={handleLogout}
+                className="ml-1 underline hover:no-underline text-white/80 hover:text-white transition-colors"
+                title="ออกจากระบบ"
+              >
+                ออกจากระบบ
+              </button>
+            </span>
+          )}
 
           {/* Theme switcher */}
           <select

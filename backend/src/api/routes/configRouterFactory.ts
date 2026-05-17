@@ -5,6 +5,7 @@ import multer from 'multer'
 import ExcelJS from 'exceljs'
 import { query } from '../../db'
 import { AppError } from '../../middleware/errorHandler'
+import { requireEditor } from '../../middleware/auth'
 import {
   CategoryDef,
   CategoryListItem,
@@ -155,9 +156,9 @@ export function makeConfigRouter(
 
   // ── POST /_auto-match-all — bulk auto-match across ALL non-pending categories (F5) ──
   // Registered BEFORE /:category to avoid the literal path being swallowed as a param.
-  router.post('/_auto-match-all', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/_auto-match-all', requireEditor, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const actor = req.header('x-actor') || 'auto-match'
+      const actor = req.authUser ?? req.header('x-actor') ?? 'auto-match'
       const reg = registryName ?? 'basic'
       const categories = list()
 
@@ -376,12 +377,12 @@ export function makeConfigRouter(
 
   // ── POST /_snapshots — capture + save a named snapshot ───────────────────
   // Registered BEFORE /:category to avoid path collision.
-  router.post('/_snapshots', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/_snapshots', requireEditor, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = snapshotLabelSchema.safeParse(req.body)
       if (!parsed.success) throw new AppError(400, 'INVALID_BODY', 'label ต้องไม่ว่างและไม่เกิน 120 ตัวอักษร')
 
-      const actor = req.header('x-actor') || 'snapshot'
+      const actor = req.authUser ?? req.header('x-actor') ?? 'snapshot'
       const reg = registryName ?? 'basic'
 
       const payload = await captureSnapshot(reg, list, get)
@@ -422,7 +423,7 @@ export function makeConfigRouter(
   // ── POST /_snapshots/:id/restore — restore a snapshot ────────────────────
   // Registered BEFORE /:category to avoid path collision.
   // Pending-guarded + parameterized + audited (same safety as F5).
-  router.post('/_snapshots/:id/restore', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/_snapshots/:id/restore', requireEditor, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const reg = registryName ?? 'basic'
       const id = parseInt(String(req.params.id), 10)
@@ -431,7 +432,7 @@ export function makeConfigRouter(
       const snap = await getSnapshot(reg, id)
       if (!snap) throw new AppError(404, 'NOT_FOUND', `ไม่พบสแน็ปช็อต id=${id}`)
 
-      const actor = 'restore'
+      const actor = req.authUser ?? 'restore'
 
       // Capture current state to compute diff
       const currentPayload = await captureSnapshot(reg, list, get)
@@ -599,7 +600,7 @@ export function makeConfigRouter(
   })
 
   // ── POST /:category/undo — revert the most recent mapping change (F2) ───────
-  router.post('/:category/undo', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/:category/undo', requireEditor, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const category = String(req.params.category)
       const c = get(category)
@@ -652,7 +653,7 @@ export function makeConfigRouter(
 
       // Record the undo itself as an audit row (enables walk-back / redo).
       // Best-effort: never break the revert if audit insert fails.
-      const actor = req.header('x-actor') || 'undo'
+      const actor = req.authUser ?? req.header('x-actor') ?? 'undo'
       await recordMappingChange({
         registry: reg,
         category,
@@ -731,7 +732,7 @@ export function makeConfigRouter(
   })
 
   // ── POST /:category/import — accept an xlsx and apply mappings ────────────
-  router.post('/:category/import', uploadImport.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/:category/import', requireEditor, uploadImport.single('file'), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const category = String(req.params.category)
       const c = get(category)
@@ -759,7 +760,7 @@ export function makeConfigRouter(
 
       const codeMapping = mappings.find(m => m.target.kind === 'code')
 
-      const actor = req.header('x-actor') || 'import'
+      const actor = req.authUser ?? req.header('x-actor') ?? 'import'
       const reg = registryName ?? 'basic'
 
       let updated = 0
@@ -884,7 +885,7 @@ export function makeConfigRouter(
     } catch (err) { next(err) }
   })
 
-  router.put('/:category/:code', async (req: Request, res: Response, next: NextFunction) => {
+  router.put('/:category/:code', requireEditor, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const category = String(req.params.category)
       const c = get(category)
@@ -893,7 +894,7 @@ export function makeConfigRouter(
       const parsed = bodySchema.safeParse(req.body)
       if (!parsed.success) throw new AppError(400, 'INVALID_BODY', 'ต้องระบุ std_code หรือ std_code2')
       const code = String(req.params.code)
-      const actor = req.header('x-actor') || 'unknown'
+      const actor = req.authUser ?? req.header('x-actor') ?? 'unknown'
       const reg = registryName ?? 'basic'
 
       // extra path: N-field extra column update

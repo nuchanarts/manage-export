@@ -5,6 +5,7 @@ import basicConfigRouter from './basicConfig'
 import eclaimConfigRouter from './eclaimConfig'
 import presenceRouter from './presence'
 import drugCatalogRouter from './drugCatalog'
+import authRouter from './auth'
 
 const router = Router()
 
@@ -12,6 +13,7 @@ router.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' })
 })
 
+router.use('/auth', authRouter)
 router.use('/records', recordsRouter)
 router.use('/validate', validateRouter)
 router.use('/basic-config', basicConfigRouter)
