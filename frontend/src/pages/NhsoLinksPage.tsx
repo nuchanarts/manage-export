@@ -41,9 +41,6 @@ export function NhsoLinksPage() {
               }`}
             >
               <h3 className="text-sm font-semibold">{group.category}</h3>
-              {group.revenue && (
-                <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">เกี่ยวกับงานรายได้</span>
-              )}
               <span className={`ml-auto text-xs ${group.revenue ? 'text-blue-100' : 'text-gray-400'}`}>
                 {group.links.length} รายการ
               </span>
