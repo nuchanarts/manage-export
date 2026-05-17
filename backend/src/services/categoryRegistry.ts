@@ -140,10 +140,10 @@ export const CATEGORY_REGISTRY: CategoryDef[] = [
     table: 'clinic', pk: 'clinic', nameCol: 'name', mapCol: 'clinic',
     stdTable: 'nhso_clinic', stdCodeCol: 'code', stdNameCol: 'name',
     pending: true },
-  // drugitems(icode PK, name, tmt_tp_code) -> tmt_tp_code(tp_code, tp_name): tmt_tp_code separate from pk icode; JOIN verified (1 live row) [verified 2026-05-17; std corrected from drugitems_register to tmt_tp_code]
+  // drugitems(icode PK, name, did=24-digit std code) -> drugitems_register(std_code, drugname)  [owner-specified 2026-05-17: 24 หลัก = drugitems.did; did distinct from pk icode; ncd24 does NOT exist; std name is plain drugname (full CONCAT format not expressible by generic builder)]
   { key: 'drug-list', label: 'รายการยา',
-    table: 'drugitems', pk: 'icode', nameCol: 'name', mapCol: 'tmt_tp_code',
-    stdTable: 'tmt_tp_code', stdCodeCol: 'tp_code', stdNameCol: 'tp_name',
+    table: 'drugitems', pk: 'icode', nameCol: 'name', mapCol: 'did',
+    stdTable: 'drugitems_register', stdCodeCol: 'std_code', stdNameCol: 'drugname',
     pending: false },
   // drugitems_ned_reason_list: no external std table; claim_control IS pk; only 4 cols (doctor_reason, claim_control, hos_guid, hos_guid_ext) [verified 2026-05-17; self-referential]
   { key: 'drug-ned-reason', label: 'เหตุผลการสั่งยา',
