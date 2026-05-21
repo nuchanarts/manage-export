@@ -63,35 +63,51 @@ router.post('/', upload.fields([
 // POST /api/validate/export-errors — export error list as Excel
 router.post('/export-errors', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { fileName, description, hospcode, personErrors, missingColumns } = req.body as {
+    const { fileName, description, hospcode, personErrors, missingColumns, exportType } = req.body as {
       fileName: string
       description: string
       hospcode: string
       personErrors: PersonError[]
       missingColumns: string[]
+      exportType?: 'pass' | 'fail'
     }
 
+    const isPass = exportType === 'pass'
     const workbook = new ExcelJS.Workbook()
-    const sheet = workbook.addWorksheet('รายการไม่ผ่าน')
+    const sheet = workbook.addWorksheet(isPass ? 'รายการผ่าน' : 'รายการไม่ผ่าน')
 
     sheet.addRow(['ไฟล์:', fileName, 'รายละเอียด:', description])
-    sheet.addRow(['HOSPCODE:', hospcode, 'จำนวนไม่ผ่าน:', personErrors.length])
-    if (missingColumns.length > 0) {
+    sheet.addRow(['HOSPCODE:', hospcode, isPass ? 'จำนวนผ่าน:' : 'จำนวนไม่ผ่าน:', personErrors.length])
+    if (!isPass && missingColumns.length > 0) {
       sheet.addRow(['คอลัมน์ที่ขาด:', missingColumns.join(', ')])
     }
     sheet.addRow([])
 
-    const headerRow = sheet.addRow(['#', 'HN', 'ชื่อ-นามสกุล', 'CID', 'PID', 'ฟิลด์ที่ผิดพลาด', 'รายละเอียด'])
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
-    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } }
-    sheet.columns = [{ width: 6 }, { width: 14 }, { width: 28 }, { width: 16 }, { width: 18 }, { width: 30 }, { width: 60 }]
+    const headerColor = isPass ? 'FF16A34A' : 'FFDC2626'
+    const rowEvenBg = isPass ? 'FFFFFFFF' : 'FFFFFFFF'
+    const rowOddBg = isPass ? 'FFF0FDF4' : 'FFFFF5F5'
 
-    personErrors.forEach((p, i) => {
-      const fields = [...new Set(p.errors.map(e => e.field))].join(', ')
-      const details = p.errors.map(e => `${e.field}(${e.caption}): ${e.type === 'NULL_REQUIRED' ? 'ค่าว่าง' : e.value ?? ''}`).join(' | ')
-      const row = sheet.addRow([i + 1, p.hn || '', p.name || '', p.cid || '', p.pid, fields, details])
-      row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 0 ? 'FFFFFFFF' : 'FFFFF5F5' } }
-    })
+    if (isPass) {
+      const headerRow = sheet.addRow(['#', 'HN', 'ชื่อ-นามสกุล', 'CID', 'PID'])
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerColor } }
+      sheet.columns = [{ width: 6 }, { width: 14 }, { width: 28 }, { width: 16 }, { width: 18 }]
+      personErrors.forEach((p, i) => {
+        const row = sheet.addRow([i + 1, p.hn || '', p.name || '', p.cid || '', p.pid])
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 0 ? rowEvenBg : rowOddBg } }
+      })
+    } else {
+      const headerRow = sheet.addRow(['#', 'HN', 'ชื่อ-นามสกุล', 'CID', 'PID', 'ฟิลด์ที่ผิดพลาด', 'รายละเอียด'])
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerColor } }
+      sheet.columns = [{ width: 6 }, { width: 14 }, { width: 28 }, { width: 16 }, { width: 18 }, { width: 30 }, { width: 60 }]
+      personErrors.forEach((p, i) => {
+        const fields = [...new Set(p.errors.map(e => e.field))].join(', ')
+        const details = p.errors.map(e => `${e.field}(${e.caption}): ${e.type === 'NULL_REQUIRED' ? 'ค่าว่าง' : e.value ?? ''}`).join(' | ')
+        const row = sheet.addRow([i + 1, p.hn || '', p.name || '', p.cid || '', p.pid, fields, details])
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 0 ? rowEvenBg : rowOddBg } }
+      })
+    }
 
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const safeName = fileName.replace(/[^a-zA-Z0-9_]/g, '')
